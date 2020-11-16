@@ -1,0 +1,10 @@
+
+\begin{tabular}{l|l}
+\hline
+Type & Mean Distance (SE)\\
+\hline
+Final & 2.535 (0.487)\\
+\hline
+Initial & 3.015 (0.358)\\
+\hline
+\end{tabular}

@@ -1,0 +1,10 @@
+
+\begin{tabular}{l|r|r}
+\hline
+Type & MSE & SE\\
+\hline
+final & 1.863658 & 0.0583892\\
+\hline
+Initial & 2.995461 & 0.4264554\\
+\hline
+\end{tabular}

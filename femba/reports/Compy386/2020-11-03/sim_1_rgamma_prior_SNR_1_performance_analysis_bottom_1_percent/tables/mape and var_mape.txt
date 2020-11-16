@@ -1,0 +1,25 @@
+
+\begin{tabular}{ll|ccccc}
+\hline
+Prior & Method & $L^{2}$ Norm & \LARGE{$\taumax$} & \LARGE{$\tauvar$} & \LARGE{$\taubeta$} & \LARGE{$\taumu$}
+\hline
+\hline
+ & Oracle & 0.3122 (0.0638) & 0.2211 (0.0782) & 0.5733 (0.2002) & 2.3935 (3.0533) & 1.7929 (1.9133)\\
+\hline
+ & Tweedie via fastICA & 0.843 (0.1384) & 0.2446 (0.0602) & 0.6741 (0.2597) & 6.3284 (8.318) & 10.1758 (12.0141)\\
+\hline
+Rgamma & Tweedie via ICA Risk Minimizer & 0.9315 (0.1438) & 0.3262 (0.0983) & 1.9033 (1.066) & 6.9368 (9.0975) & 6.9319 (7.6896)\\
+\hline
+SNR=1 & FEmBa with back-transformation & 0.8033 (0.149) & 0.3251 (0.0621) & 0.5808 (0.1699) & 6.4688 (8.4588) & 12.8751 (15.7823)\\
+\hline
+ & FEmBa with no back-transformation & 0.8659 (0.1713) & 0.3385 (0.0667) & 0.5787 (0.2057) & 5.5143 (7.1715) & 10.625 (13.0535)\\
+\hline
+ & James-Stein with back-transformation & 0.7596 (0.1431) & 0.3204 (0.0658) & 0.6485 (0.2247) & 6.1556 (8.0568) & 10.2855 (11.9544)\\
+\hline
+ & James-Stein with no back-transformation & 0.7596 (0.1431) & 0.3204 (0.0658) & 0.6485 (0.2247) & 6.1556 (8.0568) & 10.2855 (11.9544)\\
+\hline
+ & Smoothed Data & 1.5075 (0.4149) & 0.8523 (0.0403) & 0.6603 (0.1009) & 13.3445 (16.1098) & 37.0593 (43.554)\\
+\hline
+ & Unsmoothed Data & 1.5593 (0.4592) & 0.5946 (0.0796) & 0.6839 (0.2365) & 13.3445 (16.1098) & 37.0593 (43.554)\\
+\hline
+\end{tabular}

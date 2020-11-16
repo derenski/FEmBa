@@ -1,0 +1,6 @@
+"","value"
+"distribution","rnorm"
+"parameters","list(mean=c(-2,2), sd=1)"
+"iterations","20"
+"n_curves","10000"
+"p","4"

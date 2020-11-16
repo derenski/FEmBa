@@ -1,0 +1,11 @@
+
+\begin{tabular}{ll}
+\toprule
+Method & MSE (SE)\\
+\midrule
+Assumed Independence & 23.501 (0.753)\\
+Decorrelated & 23.274 (0.747)\\
+Our ICA Approach & 7.961 (0.746)\\
+Standard ICA Approach & 13.655 (0.631)\\
+\bottomrule
+\end{tabular}

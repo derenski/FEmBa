@@ -1,0 +1,21 @@
+
+\begin{tabular}{ll|ccccc}
+\hline
+Prior & Method & $L^{2}$ Norm & \LARGE{$\taumax$} & \LARGE{$\tauvar$} & \LARGE{$\taubeta$} & \LARGE{$\taumu$}
+\hline
+\hline
+ & Oracle & -0.0033 (1.3454) & -0.6459 (2.2173) & -0.6899 (3.811) & -0.0012 (0.1938) & -0.0033 (0.6744)\\
+\hline
+ & FEmBa with back-transformation & 0.0063 (2.7658) & -0.7877 (3.8474) & -1.1643 (15.0004) & 0.0044 (0.461) & 0.0063 (1.6334)\\
+\hline
+Gamma & FEmBa with no back-transformation & 0.0063 (2.6807) & -0.8361 (3.661) & -1.1809 (14.8789) & 0.0044 (0.4347) & 0.0063 (1.5323)\\
+\hline
+SNR=0.2 & James-Stein with back-transformation & 0.0063 (2.8608) & -0.7565 (3.9976) & -1.1504 (15.6973) & 0.0044 (0.4842) & 0.0063 (1.7227)\\
+\hline
+ & James-Stein with no back-transformation & 0.0063 (2.8608) & -0.7565 (3.9976) & -1.1504 (15.6973) & 0.0044 (0.4842) & 0.0063 (1.7227)\\
+\hline
+ & Smoothed Data & 0.0063 (3.463) & -0.1426 (3.813) & 0.9582 (15.0004) & 0.0044 (0.61) & 0.0063 (2.1877)\\
+\hline
+ & Unsmoothed Data & 0.0068 (3.3531) & 0.4516 (3.3095) & 1.2044 (14.9559) & 0.0046 (0.61) & 0.0068 (2.1877)\\
+\hline
+\end{tabular}
