@@ -780,7 +780,7 @@ unmixingMatrixUpdate <- function(thetaStarMatrix, UInit, sigmaTilde,
       
     riskScoreValsPrime <- ourScoreVector( uncoupledThetaTildesUrisk, derivativeOrder=1)
     
-    firstPart <- sum(t(riskScoreVals) %*% UtAUrisk %*% riskScoreVals)/dim(riskScoreVals)[2]
+    firstPart <- tr(t(riskScoreVals) %*% UtAUrisk %*% riskScoreVals)/dim(riskScoreVals)[2]
       
     secondPart <- mean(2*array(diag(UtAUrisk), dim=c(1, dim(riskScoreValsPrime)[1])) %*% riskScoreValsPrime)
     
