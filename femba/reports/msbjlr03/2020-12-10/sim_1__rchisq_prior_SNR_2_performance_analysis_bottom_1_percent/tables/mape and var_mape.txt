@@ -1,0 +1,25 @@
+
+\begin{tabular}{ll|ccccc}
+\hline
+Prior & Method & $L^{2}$ Norm & \LARGE{$\taumax$} & \LARGE{$\tauvar$} & \LARGE{$\taubeta$} & \LARGE{$\taumu$}
+\hline
+\hline
+ & Oracle & 1.8823 (0.5466) & 2.7039 (NaN) & 270.4655 (NaN) & 26.5432 (NaN) & 3.6674 (NaN)\\
+\hline
+ & \fembafastICA{} & 5.1089 (1.4855) & 5.1418 (NaN) & 10661.5823 (NaN) & 68.6854 (NaN) & 10.3473 (NaN)\\
+\hline
+Rchisq & \fembajointICA{} & 4.5728 (1.4466) & 4.7999 (NaN) & 16824.3528 (NaN) & 68.4465 (NaN) & 9.242 (NaN)\\
+\hline
+SNR=2 & \fembat{} & 4.5602 (1.436) & 4.2701 (NaN) & 30476.1526 (NaN) & 68.0888 (NaN) & 9.5196 (NaN)\\
+\hline
+ & \fembant{} & 4.8365 (1.4094) & 58.5763 (NaN) & 175377.9661 (NaN) & 67.1981 (NaN) & 9.9615 (NaN)\\
+\hline
+ & \jst{} & 3.6273 (1.1452) & 22.8025 (NaN) & 11445.1868 (NaN) & 54.6291 (NaN) & 7.4397 (NaN)\\
+\hline
+ & \jsnt{} & 3.6273 (1.1452) & 22.8025 (NaN) & 11445.1868 (NaN) & 54.6291 (NaN) & 7.4397 (NaN)\\
+\hline
+ & SMOOTH & 5.5527 (1.5458) & 86.7666 (NaN) & 1907.0962 (NaN) & 71.2735 (NaN) & 11.2253 (NaN)\\
+\hline
+ & UNSMOOTH & 5.5553 (1.5459) & 86.4919 (NaN) & 4631.7707 (NaN) & 71.2735 (NaN) & 11.2253 (NaN)\\
+\hline
+\end{tabular}

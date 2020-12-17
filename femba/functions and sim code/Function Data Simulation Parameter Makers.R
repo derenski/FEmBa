@@ -247,7 +247,7 @@ curve_generator <- function(n_obs, misspessMat, Sigma_mu, Sigma_gamma, SNR,
   raw_snr <- (norm(Sigma_mu,type = 'F')
               /norm(Sigma_gamma, type = 'F'))
   
-  muModelData <- ICAmodelDataMaker(n=n_obs, p=p_mu, quantile_func=unmixedCoordinateDist,                                            misspessMat=misspessMat, covMat=Sigma_mu)
+  muModelData <- ICAmodelDataMaker(n=n_obs, p=p_mu, quantile_func=unmixedCoordinateDfist,                                            misspessMat=misspessMat, covMat=Sigma_mu)
   
   mus <- muModelData$X
   
@@ -284,7 +284,67 @@ covariance_basis_transformer <- function(current_covariance, old_basis,
 }
 
 
+curve_generator_forceICA <- function(n_obs, Sigma_mu, SNR, 
+                            sigma_e, unmixedCoordinateDist,
+                            times){
+  
+  ICAmodelDataMaker <- function(n, p, quantile_func, covMat){
+    
+    ### Generate unmixed data with NORTA
+    XPure <-   norta(10000, corr_mat = diag(rep(1,p)), distribution = quantile_func)
+    
+    XUnmixed <- norta(n, corr_mat = diag(rep(1,p)), distribution = quantile_func)
+      
+    XUnmixed <- matrixToPower(cov(t(XPure)), -.5) %*% XUnmixed
+    
+    ### True U in so(p)
+      ### Try generatingU from different distributions rexp(dim(XUnmixed )[1]^2, rate=10)
+    UTrue <- gramSchmidt(array(runif(dim(XUnmixed )[1]^2, min=-1, max=1), 
+                               dim=rep(dim(XUnmixed )[1], 2)))$Q 
+    
+    ### Covariance matrix to the -1/2 power
+    covMatMinusHalf <- matrixToPower(covMat, -.5)
+    
+    ### True unmixing matrix
+    trueW <- UTrue %*% covMatMinusHalf
+    
+    finalOutput <- list(Omega=XUnmixed, W=trueW)
+    
+    return(finalOutput)
+    
+  }
+  
+  p <- dim(Sigma_mu)[1]
 
+  S <- bSpline(times, degree = min(p,3), df = p, intercept = T)
+  
+  icaModelData <- ICAmodelDataMaker(n=n_obs, p=p, quantile_func=unmixedCoordinateDist,
+                                   covMat=Sigma_mu)
+    
+  Omegas <- icaModelData$Omega
+  
+  Wtheta <- icaModelData$W
+  
+  U <- icaModelData$W %*% matrixToPower(Sigma_mu, .5)
+  
+  gammas <- (1/sqrt(SNR))*norta(n_obs=n_obs, corr_mat=diag(rep(1, p)))
+    
+  Atheta <- solve(Wtheta)
+                                
+  thetas <- Atheta %*% (Omegas + gammas)
+  
+  Xs <- t(S %*% thetas)
+
+  e_noise <- rmvnorm(n_obs, mean = rep(0,length(times)),
+                     sigma  = sigma_e*diag(length(times)))  
+  
+  final_output <- list(mu=solve(Wtheta) %*% Omegas, omega= Omegas + gammas, 
+                       theta=thetas, U=U, S=S, Xs=Xs, Sigma_gamma=((1/SNR))*(Atheta %*% t(Atheta)), 
+                       white_noise=e_noise)
+  
+  return(final_output)
+  
+}
 
 
 

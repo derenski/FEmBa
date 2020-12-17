@@ -1,7 +1,0 @@
-"","value"
-"distribution","rgamma"
-"parameters","list(shape=5, scale=1)"
-"iterations","100"
-"n_curves","10000"
-"num_restarts","15"
-"p","4"

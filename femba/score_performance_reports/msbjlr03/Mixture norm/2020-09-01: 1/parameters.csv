@@ -1,8 +1,0 @@
-"","value"
-"distribution","rnorm"
-"parameters","list(mean=c(0, 4), sd=1)"
-"iterations","50"
-"n_curves","5000"
-"num_restarts","10"
-"p","10"
-"rho_misspecification","0.5"

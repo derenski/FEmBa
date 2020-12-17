@@ -215,28 +215,25 @@ theMisspessMat <- make_rho_mat(0, dim(Sigma_mu)[1])
          
 ############################################################### POINT OF NO RETURN
 for (j in 1:iterations){
+    
+  timeStart <- Sys.time()
   
   error_array_this_iteration <- array(NA, dim=c(6, numMethods, 5))
+    
+  simulation_parameters <- curve_generator_forceICA(n_obs=full_n, Sigma_mu=Sigma_mu, SNR=SNR, 
+                            sigma_e=sigma_e, unmixedCoordinateDist=ourPrior,
+                            times=times)
   
-  ## Note: you can get vectors by using mean vectors instead of scalars 
-  
-  simulation_parameters <- curve_generator(n_obs=full_n, Sigma_mu=Sigma_mu, Sigma_gamma=Sigma_gamma,
-                                           SNR=SNR, misspessMat=theMisspessMat, 
-                                           sigma_e=sigma_e, unmixedCoordinateDist=ourPrior,
-                                           times=times, xSatisfyICA = TRUE)
-  
-  ms <- t(simulation_parameters$S_mu %*% simulation_parameters$mu)
+  ms <- t(simulation_parameters$S %*% simulation_parameters$mu)
     
     #sapply(ms, MARGIN=1, FUN=function(x) mean(x^2))
     #sapply(gs, MARGIN=1, FUN=function(x) mean(x^2))
   
   U <- simulation_parameters$U
   
-  gs <- t(simulation_parameters$S_gamma %*% simulation_parameters$gamma)
-  
   xs <- simulation_parameters$Xs+simulation_parameters$white_noise
   
-  cov_gamma <- cov(t(simulation_parameters$gamma))
+  cov_gamma <- simulation_parameters$Sigma_gamma
   
   smoother <- function(D,V){
     
@@ -285,7 +282,7 @@ for (j in 1:iterations){
       
     chosen_df <- min(dim(cov_gamma)[1], dim(Sigma_mu)[1])
       
-    modeling_basis <- bSpline(times, df=chosen_df, intercept = T)
+    modeling_basis <- simulation_parameters$S
     
     correctionSample <- seq(1, full_n, 1)
     
@@ -315,8 +312,8 @@ for (j in 1:iterations){
   estimated_sigma_square <- mean(
     rowMeans((unsmoothed_curves-fpca_smoothed_curves)^2))
 
-  newParameters <- parameterTransformerNewBasis(basis=modeling_basis, Sigma_mu = Sigma_mu, true_mu_basis = simulation_parameters$S_mu,
-                                                Sigma_g=cov_gamma, true_g_basis=simulation_parameters$S_gamma,
+  newParameters <- parameterTransformerNewBasis(basis=modeling_basis, Sigma_mu = Sigma_mu, true_mu_basis = simulation_parameters$S,
+                                                Sigma_g=cov_gamma, true_g_basis=simulation_parameters$S,
                                                 sigma_e=sigma_e)
   
   Sigma_mu_basis <- newParameters$Sigma_mu_basis
@@ -325,7 +322,7 @@ for (j in 1:iterations){
    
   Sigma_e_basis <- newParameters$Sigma_e_basis
 
-   estimated_conditional_sigma <- Sigma_g_basis+Sigma_e_basis
+  estimated_conditional_sigma <- Sigma_g_basis+Sigma_e_basis
     
   perturbed_covariance <- covariance_sampler(estimated_conditional_sigma, 
                                                desired_distance=0)
@@ -410,7 +407,7 @@ for (j in 1:iterations){
   thetas_oracle <- oracle_estimator(the_thetas=estimated_thetas, 
                                       Sigma_mu=Sigma_mu_basis, Sigma_g=Sigma_g_basis,
                                       the_mus=least_squares(modeling_basis, 
-                                                            y=simulation_parameters$S_mu %*% the_mus))
+                                                            y=simulation_parameters$S %*% the_mus))
     
   
  # Sigma_gamma_forOracle <- covariance_basis_transformer(current_covariance=cov_gamma,
@@ -478,6 +475,7 @@ for (j in 1:iterations){
   curves_of_interest <- lapply(all_curves, FUN=function(x) x[order(l2_smoothed, 
         decreasing = T)[1:top_k_values], ]) ## Look for largest initial norm
   
+  ### THIS IS NOT CORRECT, FIX THIS!!!!!!! 
   l2_dist_data <- sapply(curves_of_interest, FUN=bias_variance_mse, 
                          y=curves_of_interest[["actual"]])
   
@@ -499,9 +497,13 @@ for (j in 1:iterations){
   error_data[, , , j] <- error_array_this_iteration
   
   # dim1: error summary; dim2: correction method; dim3: functional; dim4: iteration
-  
+                               
+  timeEnd <- Sys.time()
+                               
   print(paste("Iteration", j, 'of', iterations, sep=' '))
-  
+                               
+  print(difftime(timeEnd, timeStart, units='mins'))
+                               
 }
 
 
@@ -514,16 +516,15 @@ for (j in 1:iterations){
 apply(error_data, MARGIN=c(1,2,3), FUN=mean)[3,,]
 
 
+covTheta <- cov(t(estimated_thetas))
+
+OmegaEst <- U %*% matrixToPower(covTheta, -.5) %*% estimated_thetas
 
 
 
 
-
-
-
-
-
-
+norm(thetas_tweedie_trans-simulation_parameters$mu, 'F')
+norm(thetas_tweedie_ICA$tweedieEstimates-simulation_parameters$mu, 'F')
 
 
 
@@ -705,13 +706,13 @@ if (perfect_covariance){
     
     combined_product[] <- paste(final_mse_data, ' (', final_se_data, ')', sep="")
     
-    rownames(combined_product) <- c("Oracle", "Tweedie via fastICA", "Tweedie via ICA Risk Minimizer", 
-                                    "FEmBa with back-transformation",
-                                    "FEmBa with no back-transformation", 
-                                    "James-Stein with back-transformation",
-                                    "James-Stein with no back-transformation",
-                                    "Smoothed Data",
-                                    "Unsmoothed Data")
+    rownames(combined_product) <- c("Oracle", "\\fembafastICA{}", "\\fembajointICA{}", 
+                                    "\\fembat{}",
+                                    "\\fembant{}", 
+                                    "\\jst{}",
+                                    "\\jsnt{}",
+                                    "SMOOTH",
+                                    "UNSMOOTH")
     
     combined_product <- cbind(rep("", dim(combined_product)[1]), rownames(combined_product), 
                               combined_product)
@@ -741,6 +742,12 @@ if (perfect_covariance){
     
     fixed_table <- str_replace(fixed_table, pattern = "Prior.*",
                                replace=latexed_names)
+      
+    fixed_table <- str_replace_all(fixed_table, pattern = "textbackslash\\{\\}",
+                               replace='')
+      
+      
+    fixed_table <- str_replace_all(fixed_table, pattern = '\\\\(?=(\\{|\\}))', replace='')  
     
     fixed_table <- str_replace(fixed_table, pattern="\\\\hline(?=\n & Oracle)", replace="\\\\hline\n\\\\hline")
     

@@ -1,7 +1,0 @@
-"","value"
-"distribution","rnorm"
-"parameters","list(mean=c(-2, 2), sd=1)"
-"iterations","100"
-"n_curves","2500"
-"num_restarts","10"
-"p","10"

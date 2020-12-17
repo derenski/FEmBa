@@ -7,6 +7,7 @@ library(pracma)
 library(expm)
 library(doParallel)
 library(foreach)
+library(plyr)
 
 source("Function Data Simulation Parameter Makers.R")
 
@@ -68,41 +69,30 @@ tweedieCorrectionNonJointICA <- function(X, Sigma_gamma,  ### Tweedie without jo
                                functionalBasis)/dim(functionalBasis)[1])
   
   sigmaTilde <- Sigma_gamma %*% basisCovarianceMatrix %*% Sigma_gamma
-               
-  sigmaTildeMinusHalf <- matrixToPower(sigmaTilde, -.5)
-               
+
   covThetaMinusHalf <- matrixToPower(cov(t(X)), -.5)
-               
-  XSigmaTildeCov <- matrixToPower(sigmaTilde, .5) %*% covThetaMinusHalf %*% X
 
   if (transformation=="ica"){
       
-    fastICAInfo <- fastICA(t(XSigmaTildeCov), n.comp = p)
+    fastICAInfo <- fastICA(t(X), n.comp = p)
       
-    WThetaTildeEst <- t(fastICAInfo$K %*% fastICAInfo$W)
+    WEst <- t(fastICAInfo$K %*% fastICAInfo$W)
         
-    UEst <- WThetaTildeEst %*% solve(sigmaTildeMinusHalf)
-     
-    WEst <-   UEst %*% covThetaMinusHalf
-        
-    Z <- WThetaTildeEst %*% XSigmaTildeCov
+    UEst <- WEst %*% solve(covThetaMinusHalf)
       
+    Z <- WEst %*% X
       
   }else if (transformation=='decorrelate'){
-        
-    WThetaTildeEst <- sigmaTildeMinusHalf 
-     
+
     WEst <- covThetaMinusHalf
         
-    Z <- WThetaTildeEst %*% XSigmaTildeCov
+    Z <- WEst %*% X
     
   }else if (transformation=="none"){
-      
-    WThetaTildeEst <- sigmaTildeMinusHalf
-      
+
     WEst <- diag(1/diag(cov(t(X))))
     
-    Z <- WThetaTildeEst %*% XSigmaTildeCov
+    Z <- WEst %*% X
 
   }else{
       
@@ -110,18 +100,22 @@ tweedieCorrectionNonJointICA <- function(X, Sigma_gamma,  ### Tweedie without jo
       
   }  
                
-  oneVec <- rep(1, dim(WThetaTildeEst)[1])
+  #oneVec <- rep(1, dim(WEst)[1])
   
-  cWs <- apply(WThetaTildeEst, MARGIN=1, 
-               FUN = function(x) t(oneVec) %*% (sigmaTilde * (x %*% t(x))) %*% oneVec)
+  #cWs <- apply(WEst, MARGIN=1, 
+  #             FUN = function(x) t(oneVec) %*% (sigmaTilde * (x %*% t(x))) %*% oneVec)
                
 
-  psi <- sapply(seq(1, dim(Z)[1]), FUN=function(i) scoreFunctionUpdate(Z=Z[i,], 
-                              cW=cWs[i], lambdaGrid=lambdaGrid, numKnots=numberOfKnotsScoreFunction,
-                              gridStep=gridStep, nFolds=numberOfFolds), simplify = F)
+  #psi <- sapply(seq(1, dim(Z)[1]), FUN=function(i) scoreFunctionUpdate(Z=Z[i,], 
+  #                            cW=cWs[i], lambdaGrid=lambdaGrid, numKnots=numberOfKnotsScoreFunction,
+  #                            gridStep=gridStep, nFolds=numberOfFolds), simplify = F)
     
   ### Updated score vector
-  psiVector <- scoreListToVector(aScoreList=psi)
+  #psiVector <- scoreListToVector(aScoreList=psi)
+               
+               
+  psiVector <- scoreFunctionUpdate(Z=Z, W=WEst, SigmaTilde=sigmaTilde, lambdaGrid=lambdaGrid, numKnots=numberOfKnotsScoreFunction, gridStep=gridStep,
+                                    nFolds=numberOfFolds)
   
   tweedieCorrection <- X + Sigma_gamma %*% t(WEst) %*% psiVector(Z)
   
@@ -199,22 +193,25 @@ tweediesFormulaOracle <- function(X, W, U, Sigma_gamma, functionalBasis, gridSte
   
   sigmaTilde <- Sigma_gamma %*% basisCovarianceMatrix %*% Sigma_gamma
   
-  XSigmaTildeCov <- matrixToPower(sigmaTilde, .5) %*% matrixToPower(cov(t(X)), -.5) %*% X
+  covThetaMinusHalf <- matrixToPower(cov(t(X)), -.5) 
   
-  WthetaTilde <- U %*% matrixToPower(sigmaTilde, -.5)
+  Wtheta <- U %*% covThetaMinusHalf
   
   oneVec <- array(rep(1, dim(sigmaTilde)[1]), dim=c(dim(sigmaTilde)[1], 1))
   
-  cWs <- apply(WthetaTilde, MARGIN=1, 
-               FUN = function(x) t(oneVec) %*% (sigmaTilde * (x %*% t(x))) %*% oneVec)
+  #cWs <- apply(Wtheta, MARGIN=1, 
+  #             FUN = function(x) t(oneVec) %*% (sigmaTilde * (x %*% t(x))) %*% oneVec)
   
-  XUnmixed <- WthetaTilde %*% XSigmaTildeCov
+  XUnmixed <- Wtheta %*% X
   
-  trueScoreCoordinates <- sapply(seq(1, dim(XUnmixed)[1]), FUN=function(i) scoreFunctionUpdate(Z=XUnmixed[i,], 
-                cW=cWs[i], lambdaGrid=lambdaGrid, numKnots=numberOfKnotsScoreFunction, 
-                gridStep=gridStep, nFolds=numberOfFolds), simplify = F)
+  #trueScoreCoordinates <- sapply(seq(1, dim(XUnmixed)[1]), FUN=function(i) scoreFunctionUpdate(Z=XUnmixed[i,], 
+  #              cW=cWs[i], lambdaGrid=lambdaGrid, numKnots=numberOfKnotsScoreFunction, 
+  #              gridStep=gridStep, nFolds=numberOfFolds), simplify = F)
   
-  TrueUnmixedScoreVector <- scoreListToVector(aScoreList=trueScoreCoordinates)
+  #TrueUnmixedScoreVector <- scoreListToVector(aScoreList=trueScoreCoordinates)
+               
+  TrueUnmixedScoreVector <- scoreFunctionUpdate(Z=XUnmixed, W=Wtheta, SigmaTilde=sigmaTilde, lambdaGrid=lambdaGrid, numKnots=numberOfKnotsScoreFunction, gridStep=gridStep,
+                                    nFolds=numberOfFolds)
   
   tweedieCorrectedXs <- X + Sigma_gamma %*% t(W) %*% TrueUnmixedScoreVector(XUnmixed)
   
@@ -307,10 +304,7 @@ tweedieCorrectionWithICARandomRestart <- function(X, Sigma_gamma,  ### Tweedie's
   covTheta <- cov(t(X)) ### Estimated covariance of data
   
   ### Covariance of data to the -1/2 power
-  covThetaMinusHalf <- matrixToPower(covTheta, -.5)
-  
-  ### Sigma tilde to the -1/2 power
-  sigmaTildeMinusHalf <- matrixToPower(sigmaTilde, -.5)                            
+  covThetaMinusHalf <- matrixToPower(covTheta, -.5)                     
   
   ### Initialization of U, where U is in so(p) 
                                
@@ -417,18 +411,12 @@ tweedieCorrectionWithICAWarmStart <- function(X, Sigma_gamma,  ### Tweedie's for
   
   ### Covariance of data to the -1/2 power
   covThetaMinusHalf <- matrixToPower(covTheta, -.5)
-  
-  ### Sigma tilde to the -1/2 power
-  sigmaTildeMinusHalf <- matrixToPower(sigmaTilde, -.5)                            
-  
-  ### Initialization of U, where U is in so(p) 
-   XSigmaTildeCov <- matrixToPower(sigmaTilde, .5) %*% covThetaMinusHalf %*% X
 
-   fastICAInfo <- fastICA(t(XSigmaTildeCov), n.comp = dim(Sigma_gamma)[1])
+   fastICAInfo <- fastICA(t(X), n.comp = dim(Sigma_gamma)[1])
     
-   WThetaTildeEst <- t(fastICAInfo$K %*% fastICAInfo$W)
+   WEst <- t(fastICAInfo$K %*% fastICAInfo$W)
     
-   UWarmStart <- WThetaTildeEst %*% solve(sigmaTildeMinusHalf)
+   UWarmStart <- WEst%*% solve(covThetaMinusHalf)
     
    # XUncorr <- covThetaMinusHalf %*% X
     
@@ -446,8 +434,6 @@ tweedieCorrectionWithICAWarmStart <- function(X, Sigma_gamma,  ### Tweedie's for
     finalU <- scoreFunctionAndUnmixingMatrix$U
 
     finalW <- finalU %*% covThetaMinusHalf
-    
-    finalWTilde <- finalU %*% sigmaTildeMinusHalf
 
           ### The score function vector
     scoreVectors <- scoreFunctionAndUnmixingMatrix$score_vector
@@ -455,7 +441,7 @@ tweedieCorrectionWithICAWarmStart <- function(X, Sigma_gamma,  ### Tweedie's for
           ### Uncoupled data based on our estimated unmixing matrix
     #uncoupledThetaTildes <- finalW %*% X
     
-    uncoupledThetaTildes <- finalWTilde %*% XSigmaTildeCov
+    uncoupledThetaTildes <- finalW %*% X
 
           ### The tweedie correction
     tweedieCorrection <- X + Sigma_gamma %*% t(finalW) %*% scoreVectors(uncoupledThetaTildes)
@@ -574,33 +560,27 @@ scoreFunctionWithICA <- function(thetaMatrix, sigmaTilde, UInit, lambdaGrid=10^s
   ### Covariance of Data to the -1/2 power
   covThetaMinusHalf <- matrixToPower(covTheta, -.5)
   
-  ### Sigma tilde to the -1/2 power
-  sigmaTildeMinusHalf <- matrixToPower(sigmaTilde, -.5)
-  
-  ### Rotation of data so it has covariance Sigma tilde
-  thetasSigmaTildeCov <- solve(sigmaTildeMinusHalf) %*% covThetaMinusHalf %*% thetaMatrix
-  
   oneVec <- matrix(1, nrow=dim(UInit)[2], ncol=1)
-  
-  ### Initial W tilde
-  WtThetaTilde <- UInit %*% sigmaTildeMinusHalf
   
   ### Intial W
   Wt <- UInit %*% covThetaMinusHalf
   
   ### Constants needed for estimation score vector
-  cWs <- apply(WtThetaTilde, MARGIN=1, 
-               FUN = function(x) t(oneVec) %*% (sigmaTilde * (x %*% t(x))) %*% oneVec)
+  #cWs <- apply(Wt, MARGIN=1, 
+  #             FUN = function(x) t(oneVec) %*% (sigmaTilde * (x %*% t(x))) %*% oneVec)
   
   ### Initialization of uncoupled data
-  Zt <- WtThetaTilde %*% thetasSigmaTildeCov
+  Zt <- Wt %*% thetaMatrix
   
   ### Initialization of score functions
-  psi_t <- sapply(seq(1, dim(Zt)[1]), FUN=function(i) scoreFunctionUpdate(Z=Zt[i,], cW=cWs[i], 
-        lambdaGrid=lambdaGrid, numKnots=numKnots, gridStep=gridStep, nFolds=nFolds), simplify = F)
+  #psi_t <- sapply(seq(1, dim(Zt)[1]), FUN=function(i) scoreFunctionUpdate(Z=Zt[i,], cW=cWs[i], 
+  #      lambdaGrid=lambdaGrid, numKnots=numKnots, gridStep=gridStep, nFolds=nFolds), simplify = F)
   
   ### Convert list to vector function
-  psi_tVector <- scoreListToVector(aScoreList=psi_t)
+  #psi_tVector <- scoreListToVector(aScoreList=psi_t)
+                  
+  psi_tVector <- scoreFunctionUpdate(Z=Zt, W=Wt, SigmaTilde=sigmaTilde, lambdaGrid=lambdaGrid, numKnots=numKnots, gridStep=gridStep,
+                                    nFolds=nFolds)
   
   ### Score function values for unmixed data
   unmixedScoreVals_t <- psi_tVector(Zt, derivativeOrder = 0)
@@ -622,7 +602,7 @@ scoreFunctionWithICA <- function(thetaMatrix, sigmaTilde, UInit, lambdaGrid=10^s
     ### This is because to update W we further decomepose it into two matrices
     
     ### Current U in so(p). We first update Ut and then update the score functions based on Ut.
-    Ut <- WtThetaTilde %*% solve(sigmaTildeMinusHalf)
+    Ut <- Wt %*% solve(covThetaMinusHalf)
     
     ### The updated Ut
     UtPlusOne <- unmixingMatrixUpdate(thetaStarMatrix= thetaMatrix, sigmaTilde=sigmaTilde,
@@ -632,26 +612,27 @@ scoreFunctionWithICA <- function(thetaMatrix, sigmaTilde, UInit, lambdaGrid=10^s
                                     maxIterationsU = updateUSpecs["max_iterations"],
                                     minChangeU = updateUSpecs["min_change"])
     
-    ### The new W wilde
-    WtPlusOneThetaTilde <- UtPlusOne %*% sigmaTildeMinusHalf
-    
     ### The new W
     WtPlusOne <- UtPlusOne %*% covThetaMinusHalf
     
     ### Constants needed for score function estimation
-    cWs <- apply(WtPlusOneThetaTilde, MARGIN=1, 
-                 FUN = function(x) t(oneVec) %*% (sigmaTilde * (x %*% t(x))) %*% oneVec)
+    #cWs <- apply(WtPlusOne, MARGIN=1, 
+    #             FUN = function(x) t(oneVec) %*% (sigmaTilde * (x %*% t(x))) %*% oneVec)
     
     ### Unmixed data based on new W tilde
-    ZtPlusOne <- WtPlusOneThetaTilde %*% thetasSigmaTildeCov
+    ZtPlusOne <- WtPlusOne %*% thetaMatrix
     
     ### Updated score functions
-    psi_tPlusOne <- sapply(seq(1, dim(ZtPlusOne)[1]), FUN=function(i) scoreFunctionUpdate(Z=ZtPlusOne[i,], 
-                              cW=cWs[i], lambdaGrid=lambdaGrid, numKnots=numKnots,
-                              gridStep=gridStep, nFolds=nFolds), simplify = F)
+   # psi_tPlusOne <- sapply(seq(1, dim(ZtPlusOne)[1]), FUN=function(i) scoreFunctionUpdate(Z=ZtPlusOne[i,], 
+   #                           cW=cWs[i], lambdaGrid=lambdaGrid, numKnots=numKnots,
+   #                           gridStep=gridStep, nFolds=nFolds), simplify = F)
     
     ### Updated score vector
-    psi_tPlusOneVector <- scoreListToVector(aScoreList=psi_tPlusOne)
+    # psi_tPlusOneVector <- scoreListToVector(aScoreList=psi_tPlusOne)
+                 
+                 
+    psi_tPlusOneVector <- scoreFunctionUpdate(Z=ZtPlusOne, W=WtPlusOne, SigmaTilde=sigmaTilde, lambdaGrid=lambdaGrid, numKnots=numKnots, gridStep=gridStep,
+                                    nFolds=nFolds)
     
     ### Values needed to calculate risk
     unmixedScoreVals_tPlusOne <- psi_tPlusOneVector(ZtPlusOne, derivativeOrder = 0)
@@ -665,7 +646,7 @@ scoreFunctionWithICA <- function(thetaMatrix, sigmaTilde, UInit, lambdaGrid=10^s
     mixedScoreVals_tPlusOne <- t(WtPlusOne) %*% unmixedScoreVals_tPlusOne
 
     ### The absolute percentage change in the risk
-    Change <- abs(risk_t-risk_tPlusOne)/abs(risk_t)
+    Change <- (risk_t-risk_tPlusOne)/abs(risk_t)
     
     overMinIterationsU <- iterator > algorithmSpecs["min_iterations"]
     
@@ -677,15 +658,11 @@ scoreFunctionWithICA <- function(thetaMatrix, sigmaTilde, UInit, lambdaGrid=10^s
     
     }else{
       
-      ### Updating the needed parameters for the next iteration
-      
-      WtThetaTilde <- WtPlusOneThetaTilde
-      
       Wt <- WtPlusOne
       
       Zt <- ZtPlusOne
       
-      psi_t <- psi_tPlusOne
+      #psi_t <- psi_tPlusOne
       
       psi_tVector <- psi_tPlusOneVector
       
@@ -780,7 +757,8 @@ unmixingMatrixUpdate <- function(thetaStarMatrix, UInit, sigmaTilde,
       
     riskScoreValsPrime <- ourScoreVector( uncoupledThetaTildesUrisk, derivativeOrder=1)
     
-    firstPart <- sum(t(riskScoreVals) %*% UtAUrisk %*% riskScoreVals)/dim(riskScoreVals)[2]
+    ## This should be trace
+    firstPart <- tr(t(riskScoreVals) %*% UtAUrisk %*% riskScoreVals)/dim(riskScoreVals)[2]
       
     secondPart <- mean(2*array(diag(UtAUrisk), dim=c(1, dim(riskScoreValsPrime)[1])) %*% riskScoreValsPrime)
     
@@ -789,40 +767,34 @@ unmixingMatrixUpdate <- function(thetaStarMatrix, UInit, sigmaTilde,
   }
   
   ### The gradient of the risk
-  nablaRHat <- function(uRisk, thetaTildeMatrix, scoreFunctionVector, A){
+  nablaRHat <- function(uRisk, thetaTildeMatrix, scoreFunctionVector, A){      
       
-    crossTermCalculatorForU <- function(scoreVector, theU){
+    alternateCrossTermCalculatorForThetaTilde <- function(thetaMat, scoreVectorMat, 
+                                                          scoreVectorPrimeMat, UtAU){
         
-        reverseIdentityMat <- array(1, dim=rep(length(scoreVector), 2))-diag(rep(1, 
-                            length(scoreVector)))
+        finalTermMatrix <- array(NA, dim=rep(dim(scoreVectorMat)[1], 2))
         
-        scoreVectorMadeMatrixWithMissingDiag <- sapply(scoreVector, FUN=rep,
-                                                       length(scoreVector))*reverseIdentityMat
+        IkByk <- diag(rep(1, dim(scoreVectorMat)[1]))
         
-        neededTerm <- scoreVectorMadeMatrixWithMissingDiag %*% theU
+        for (l in 1:dim(thetaTildeMatrix)[1]){
         
-        scoreVectorAsMatrix <- t(sapply(scoreVector, FUN=rep, dim(uRisk)[1]))
-        
-        return(scoreVectorAsMatrix*neededTerm)
-        
-    }    
-      
-    crossTermCalculatorForThetaTilde <- function(scoreVector, scoreVectorPrime, UtAU){
-        
-        reverseIdentityMat <- array(1, dim=rep(length(scoreVector), 2))-diag(rep(1,
-                                    length(scoreVector)))
+            e_l <- array(rep(0, dim(scoreVectorMat)[1]), dim=c(dim(scoreVectorMat)[1], 1) )
 
-        scoreVectorMadeMatrixWithMissingDiag <- UtAU*sapply(scoreVector, FUN=rep,
-                                                       length(scoreVector))*reverseIdentityMat
+            e_l[l,1] <- 1
+
+            neededPrimeVec <- scoreVectorPrimeMat[l,]
+
+            G_l <- scoreVectorMat * sapply(neededPrimeVec, FUN=rep, dim(scoreVectorMat)[1])
+
+            finalTermMatrix[l,] <- (2/dim(scoreVectorMat)[2])*(UtAU[l,] %*% (IkByk-(e_l %*% t(e_l)))
+                                                              %*% G_l %*% t(thetaMat)) 
+            
+            }
         
-        scoreVectorPrimeAsMatrix <- t(sapply(scoreVectorPrime, FUN=rep, dim(uRisk)[1]))
-        
-        return(2*scoreVectorPrimeAsMatrix*scoreVectorMadeMatrixWithMissingDiag)
-        
-    }     
+        return(finalTermMatrix)
+
+    }
       
-      
-    
     uncoupledThetaTildesUrisk <- uRisk %*% thetaTildeMatrix
       
     scoreVals <- scoreFunctionVector(uncoupledThetaTildesUrisk, derivativeOrder=0)
@@ -851,25 +823,14 @@ unmixingMatrixUpdate <- function(thetaStarMatrix, UInit, sigmaTilde,
       
       
     ### Terms that get multiplied to U, with cross terms  
-    thirdPartUnAggregatedU <- apply(scoreVals, MARGIN=2, FUN= crossTermCalculatorForU, 
-                                   theU=uRisk %*% t(A))
-      
-    thirdPartU <- Reduce("+", thirdPartUnAggregatedU) / length(thirdPartUnAggregatedU)
       
       
-    thirdPartUnAggregatedTheta <- sapply(1:dim(scoreVals)[2], FUN=function(x)
-        crossTermCalculatorForThetaTilde(scoreVector=scoreVals[,x],
-                                        scoreVectorPrime=scoreValsPrime[,x],
-                                        UtAU=UtAU))
-                                         
-    thetasExpanded <- sapply(1:dim(thetaTildeMatrix)[2], 
-                             FUN=function(x) sapply(x, FUN=rep, length(x)))
-                             
-    listOfThetaCrossTerms <- sapply(1:length(thetasExpanded), FUN=function(x)
-      thirdPartUnAggregatedTheta[[x]] %*% thetasExpanded[[x]]  )
-                                         
-    thirdPartThetaCrossTerms <- Reduce("+", listOfThetaCrossTerms) / length(listOfThetaCrossTerms)
+    thirdPartU <- (1/dim(thetaTildeTermsMatrix)[2]) * (scoreVals %*% t(scoreVals)-diag(diag(scoreVals %*% t(scoreVals)))) %*% (uRisk %*% t(A))
+
       
+    thirdPartThetaCrossTerms <-  alternateCrossTermCalculatorForThetaTilde(thetaMat=thetaTildeMatrix,
+                                 scoreVectorMat=scoreVals, scoreVectorPrimeMat=scoreValsPrime, 
+                                  UtAU=UtAU)
       
     nablaValues <- firstPart + secondPart + thirdPartU + thirdPartThetaCrossTerms
 
@@ -920,6 +881,9 @@ unmixingMatrixUpdate <- function(thetaStarMatrix, UInit, sigmaTilde,
     neededRiskTerms <- mapply(riskSatisfactionTerms, x=potentialUs, y=etaGrid)
     
     doesItSatisfy <- apply(neededRiskTerms, 2, FUN = function(x) x[1] >= x[2])
+                           
+    doesItSatisfy[is.na(doesItSatisfy)] <- TRUE
+    
     
     if(all(doesItSatisfy)){
       ### If we can't improve, we choose our step to be the identity matrix (so no change)
@@ -999,7 +963,7 @@ unmixingMatrixUpdate <- function(thetaStarMatrix, UInit, sigmaTilde,
                            
                            
                            
-                           
+if (FALSE){ ### OLD SCORE FUNCTION ESTIMATOR, COMMENTED OUT                          
 
 
 #### Update Score function
@@ -1026,7 +990,7 @@ scoreFunctionUpdate <- function(Z, cW, lambdaGrid=10^seq(-6, 6, 1), numKnots=10,
     
     omega <- gridStep*base::crossprod(basisSecondDerivative)
     
-    riskValue <- t(betaHat) %*% (sMatrix+lambda*omega) %*% betaHat + 2*cW * t(sPrimeVec) %*% betaHat
+    riskValue <- cW*t(betaHat) %*% (sMatrix+lambda*omega) %*% betaHat + 2*cW * t(sPrimeVec) %*% betaHat
     
     return(riskValue)
     
@@ -1051,7 +1015,7 @@ scoreFunctionUpdate <- function(Z, cW, lambdaGrid=10^seq(-6, 6, 1), numKnots=10,
     
     omega <- gridStep*base::crossprod(basisSecondDerivative)
     
-    betaHat <- -cW*solve(sMatrix+lambda*omega) %*% sPrimeVec
+    betaHat <- -1*cW*solve(cW*sMatrix+lambda*omega) %*% sPrimeVec
     
     return(betaHat)
     
@@ -1174,7 +1138,292 @@ scoreFunctionUpdate <- function(Z, cW, lambdaGrid=10^seq(-6, 6, 1), numKnots=10,
   
 }
 
+} #### OLD SCORE FUNCTION ESTIMATOR, COMMENTED OUT
+                           
+                           
+                           
+                           
+                           
+                           
+                           
+                           
+                           
+                           
+                           
+                           
+                           
+                           
+                           
+                           
+                           
+### SCORE FUNCTION WITHOUT SEPARABILITY                           
+                           
+scoreFunctionUpdate <- function(Z, W, SigmaTilde, lambdaGrid=10^seq(-6, 6, 1), 
+                                numKnots=10, gridStep=.01,
+                                    nFolds=5){
+    
+  options(warn=-1)
+    
+    
+  basisEvalInLongVec <- function(basisList, zVec){
+    
+    
+    basisEval <- unlist(lapply(1:length(basisList), 
+                               FUN=function(x) predict(basisList[[x]], zVec[x])))
+                               
+    return(array(basisEval, dim=c(length(basisEval), 1)))
+    
+    }
+                               
+                               
+  evalInBlockDiag <- function(basisList, zVec){
+    
+    basisEval <- lapply(1:length(basisList), 
+                        FUN=function(x) predict(basisList[[x]], zVec[x]))
+                               
+    return(as.array(bdiag(basisEval)))
+    
+    }
+                        
+                        
+  evalAsList <- function(basisList, zVec){
+    
+    basisEval <- lapply(1:length(basisList), 
+                        FUN=function(x) predict(basisList[[x]], zVec[x]))
+                               
+    return(basisEval)
+    
+    }
+                        
+                        
+  knotMaker <- function(z, numKnots=10){
+    
+      num_knots_plus_1 <- numKnots+1 ### Give the number of knots, plus 1
+  
+      theProbs <- seq(1:(num_knots_plus_1-1))/(num_knots_plus_1)
+  
+      theKnots <- quantile(Z, probs = theProbs) ### Knots based on quantiles
+  
+  ### Making sure knots are not placed are extreme points in the data
+      if (min(theKnots) == min(z)){
+    
+        theKnots[which(theKnots==min(z))] <- min(z[which(z != min(z))])
+    
+    
+      }
+  
+      if (max(theKnots) == max(z)){
+    
+        theKnots[which(theKnots==max(z))] <- min(Z[which(z != max(z))])
+    
+    
+      }
+  
+  ### Generating the basis to be used to represent the score function
+      theKnots <- unique(theKnots)
+    
+      return(theKnots)
+    
+    }
 
+
+    gridMaker <- function(z, gridStep=.001){
+    
+      zMin <- floor(min(z, na.rm = T))
+  
+      zMax <- ceiling(max(z, na.rm = T))
+  
+      zGrid <- seq(zMin, zMax,  gridStep)
+    
+    }
+  
+  ### Calculates the risk
+  riskCalculator <- function(betaHat, lambda, T1, T2, cW){
+    
+    riskValue <- t(betaHat) %*% T1 %*% betaHat + 2*t(cW) %*% T2 %*% betaHat
+    
+    return(riskValue)
+    
+  }
+  
+  ### Calculates the basis coefficient vector for the score function
+  betaCalculator <- function(lambda, T1, T2, T3, cW){
+          
+    betaHat <- -1*ginv(T1+lambda*T3) %*% t(T2) %*% cW
+      
+    
+    return(betaHat)
+    
+  }
+  
+  ### If bigger than 1, perform cross validation, otherwise estimate from given turning parameter
+  CV <- length(lambdaGrid) > 1
+    
+    
+  if (CV & (nFolds==1)){
+      
+      stop("Must have multiple folds if doing CV.")
+      
+  }
+  
+  ### Number of curves
+  n <- dim(Z)[2]
+
+  K <- dim(Z)[1]
+  
+  knots <- alply(Z, 1, knotMaker, numKnots=10)
+
+  grids <- alply(Z, 1, gridMaker)
+    
+    #### number of knots = df-degree
+   #### Specify knots to be at quantiles 
+  
+  df <- numKnots+1+min(3,n)
+                        
+  bases<- lapply(1:K,FUN = function(x) bSpline(grids[[x]], degree = min(3,n), df=df,
+                                               intercept = T)) ### use knots
+                 
+                 
+  WSigmaTildeTW <- W %*% SigmaTilde %*% t(W)
+      
+  oneVec <- array(rep(1, dim(W)[1]), dim=c(dim(W)[1], 1))  
+      
+  cW <- array(apply(W, MARGIN=1, FUN=function(x) t(oneVec) %*% ( SigmaTilde * x %*% t(x) ) %*% oneVec), dim=c(length(oneVec), 1))
+      
+  n <- dim(Z)[2]
+      
+  WSigmaTildeTWBigChungus <-  apply(t(apply(WSigmaTildeTW, MARGIN=1, 
+                                              FUN=rep, each=dim(bases[[1]])[2])), 
+                                      MARGIN=2, FUN=rep, each=dim(bases[[1]])[2])
+    
+  allTheEvals <- alply(Z, 2, basisEvalInLongVec, basisList=bases)
+      
+  allTheCrossProds <- lapply(allTheEvals, FUN=function(x) crossprod(t(x)))  
+      
+  basesDerivs <- lapply(bases, FUN=deriv, derivs=1L)
+      
+  derivEvals <- alply(Z, 2, evalInBlockDiag, basisList=basesDerivs)
+                             
+  basesSecondDerivs <- lapply(bases, FUN=deriv, derivs=2L)
+                             
+  T1 <- WSigmaTildeTWBigChungus*Reduce('+', allTheCrossProds)/length(allTheCrossProds)
+      
+  T2 <- Reduce("+", derivEvals)/length(derivEvals) 
+    
+  T3 <- as.matrix(bdiag(lapply(basesSecondDerivs, FUN=function(x) gridStep*base::crossprod(x) )))
+  
+  if (CV){ ### Cross-validation for tuning parameter estimation
+    
+    cvFolds <- createFolds(1:n, k =nFolds)
+    
+    ### Cross validation done in parallel
+    cvErrorsForLambdas <- foreach(lamb=lambdaGrid,
+                .packages=c('splines2', "caret", 'MASS', 'plyr', 'Matrix'), .combine = 'c') %dopar% {
+      
+      risksThisLambda <- c()
+      
+      cvFolds <- createFolds(1:n, k =nFolds)
+      
+      for (fold in cvFolds){
+      
+        trainZ <- Z[, -fold]
+        
+        valZ <- Z[, fold]
+          
+        T1Train <- WSigmaTildeTWBigChungus*Reduce('+', allTheCrossProds[-fold])/length(allTheCrossProds[-fold])
+          
+        T1Val <- WSigmaTildeTWBigChungus*Reduce('+', allTheCrossProds[fold])/length(allTheCrossProds[fold])
+      
+        T2Train <- Reduce("+", derivEvals[-fold])/length(derivEvals[-fold]) 
+          
+        T2Val <- Reduce("+", derivEvals[fold])/length(derivEvals[fold]) 
+    
+        T3Train <- as.matrix(bdiag(lapply(basesSecondDerivs, FUN=function(x) gridStep*base::crossprod(x) )))
+      
+        betaHatThisFoldThisLambda <- betaCalculator(lambda=lamb, T1=T1Train, T2=T2Train, T3=T3, cW=cW)
+        
+        riskThisFoldThisLambda <- riskCalculator(betaHat=betaHatThisFoldThisLambda, 
+                                                 lambda=lamb, T1=T1Val, T2=T2Val, cW=cW)
+        
+        risksThisLambda <- c(risksThisLambda, riskThisFoldThisLambda)
+      
+      }
+     
+      mean(risksThisLambda)
+       
+    }
+    
+    chosenLambda <- lambdaGrid[which.min(cvErrorsForLambdas)]
+    
+  }else{
+    
+    chosenLambda <- lambdaGrid
+    
+  }
+  
+  bigBetaHat <- betaCalculator(lambda=chosenLambda, T1=T1, T2=T2, T3=T3, cW=cW)
+                                          
+  basesDimensionSizes <- unlist(lapply(bases, FUN=function(x) dim(x)[2]))
+                                
+  betaBreakPoints <- cumsum(basesDimensionSizes)-basesDimensionSizes+1
+                                          
+  brokenBeta <- Map(function(i,j) bigBetaHat[i:j, , drop=FALSE], 
+                    betaBreakPoints, cumsum(diff(c(betaBreakPoints, dim(bigBetaHat)[1]+1))))
+                                          
+  scoreFunctionCoordinate <- function(basis, betaHat){
+      
+    finalCoordinate <- function(z, derivativeOrder=0){ ### Note, z is a scalar!
+        
+        if (derivativeOrder==0){
+
+          basisNow = basis
+
+        }else{
+
+        basisNow <- deriv(basis, derivs = derivativeOrder)
+    
+    }
+    
+    basisVec = predict(basisNow, newx = z)
+    
+    return(basisVec %*% betaHat)
+        
+        }
+      
+      return(finalCoordinate)
+    
+  }
+            
+  #force(scoreFunctionCoordinate)
+                                       
+  scoreFunctionList <- lapply(1:length(brokenBeta), FUN = function(k)
+      scoreFunctionCoordinate(basis=bases[[k]], betaHat=brokenBeta[[k]])  )      
+                              
+  scoreListToVector <- function(aScoreList){
+    
+    ### The output. Its arguments are a numberic vector, and an argument for desired order of derivative
+    scoreVector <- function(theta, derivativeOrder=0){
+      
+      if (!is.matrix(theta)){
+        
+        theta <- array(theta, dim=c(length(theta), 1))
+        
+      }
+      
+      return(t(sapply(1:dim(theta)[1], FUN=function(x) aScoreList[[x]](theta[x,], derivativeOrder=derivativeOrder))))
+      
+    }
+    
+    return(scoreVector)
+    
+    
+  }
+               
+  finalScoreVector <- scoreListToVector(aScoreList = scoreFunctionList)
+  
+  return(finalScoreVector)
+  
+}
 
 
 

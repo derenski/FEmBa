@@ -1,0 +1,10 @@
+
+\begin{tabular}{l|l}
+\hline
+Type & Mean Distance (SE)\\
+\hline
+Our Approach & 0.002 (0.001)\\
+\hline
+Standard ICA & 0.005 (0.003)\\
+\hline
+\end{tabular}

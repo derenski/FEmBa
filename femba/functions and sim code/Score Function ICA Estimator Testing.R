@@ -11,6 +11,7 @@ library(LaplacesDemon)
 library(MASS)
 library(glmnet)
 library(stringr)
+library(plyr)
 library(dplyr)
 library(gtools)
 library(splines)
@@ -211,6 +212,8 @@ rho_misspecification <- as.numeric(sim_params["rho_misspecification", ])
          
          
 takeAbs <- as.logical(sim_params["take_abs", ])
+         
+makeSymmetric <- as.logical(sim_params["make_symmetric", ])
 
 ### Dimension of the vectors
 p <- as.numeric(sim_params['p', ])
@@ -246,7 +249,14 @@ if (takeAbs){
 
     newThing <- abs(do.call(unmixedDist, c(list(n=100000), distributionParameters)))
     
-    }else{
+    }else if (makeSymmetric){
+    
+    radOnes <- sample(c(-1,1), size=100000, replace=T, prob=c(.5, .5))
+    
+    newThing <- radOnes*do.call(unmixedDist, c(list(n=100000), distributionParameters))
+    
+    
+}else{
     
     newThing <- do.call(unmixedDist, c(list(n=100000), distributionParameters))
     
@@ -267,6 +277,9 @@ errorData <- array(NA, dim=c(4, 6, simIterations))
 dimnames(errorData)[[1]] <- c("Assumed Independence", "Decorrelated", "Standard ICA Approach", "Our ICA Approach") 
 
 for (i in 1:simIterations){
+  
+  ### Iteration Start
+  timeStart <- Sys.time()
   
   ### Simulate data
   simulationData <- ICAmodelDataMaker(n=n_curves, p=p, quantile_func=theQuantileFunction, rho=.5, 
@@ -300,8 +313,8 @@ for (i in 1:simIterations){
                                                      Sigma_gamma=Sigma_gamma, 
                                                   functionalBasis=diag(rep(1, dim(Sigma_gamma)[1])), 
                                                      gridStep = .001, 
-                                                  lambdaGrid=10^seq(-6, 4, 1),
-                                                  numberOfFolds = 5, 
+                                                  lambdaGrid=10^seq(-6, 3, 1),
+                                                  numberOfFolds = 2, 
                                                   numberOfKnotsScoreFunction = 8,
                                                   maxIterations=100)
   
@@ -313,8 +326,8 @@ for (i in 1:simIterations){
                                      functionalBasis=diag(rep(1, dim(Sigma_gamma)[1])),  
                                      transformation="none",
                                      gridStep = .001, 
-                                     lambdaGrid=10^seq(-6, 6, 1),
-                                     numberOfFolds = 5, 
+                                     lambdaGrid=10^seq(-6, 3, 1),
+                                     numberOfFolds = 2, 
                                      numberOfKnotsScoreFunction = 8)  
     
   
@@ -327,8 +340,8 @@ for (i in 1:simIterations){
                                      functionalBasis=diag(rep(1, dim(Sigma_gamma)[1])),  
                                      transformation="decorrelate",
                                      gridStep = .001, 
-                                     lambdaGrid=10^seq(-6, 6, 1),
-                                     numberOfFolds = 5, 
+                                     lambdaGrid=10^seq(-6, 3, 1),
+                                     numberOfFolds = 2, 
                                      numberOfKnotsScoreFunction = 8)
   
   scoreValuesUncorrAssumedIndependent <- uncorrelatedAssumedIndependentInfo$tweedieEstimates
@@ -338,7 +351,7 @@ for (i in 1:simIterations){
                                      Sigma_gamma=Sigma_gamma,  ### Tweedie without joint unmixing and score function estimation
                                      functionalBasis=diag(rep(1, dim(Sigma_gamma)[1])),  
                                      transformation="ica", gridStep = .001, 
-                                     lambdaGrid=10^seq(-6, 6, 1), numberOfFolds = 5, 
+                                     lambdaGrid=10^seq(-6, 3, 1), numberOfFolds = 2, 
                                      numberOfKnotsScoreFunction = 8)
     
   scoreValuesAlternateICA <- tweedieAlternateICAInfo$tweedieEstimates
@@ -360,8 +373,8 @@ for (i in 1:simIterations){
     
     ourMethodResults <- tweedieCorrectionWithICAWarmStart(X, Sigma_gamma=Sigma_gamma,  ### Tweedie's formula with estimtated score function.
                                      functionalBasis=diag(rep(1, dim(Sigma_gamma)[1])),        ### Score function estimated with ICA approach
-                                     gridStep = .001, lambdaGrid=10^seq(-6, 6, 1),
-                                     numberOfFolds = 5, numberOfKnotsScoreFunction = 8,
+                                     gridStep = .001, lambdaGrid=10^seq(-6, 3, 1),
+                                     numberOfFolds = 2, numberOfKnotsScoreFunction = 8,
                                   algorithmSpecs=algorithmSpecs,
                                   updateUSpecs=updateUSpecs)  
     
@@ -395,8 +408,11 @@ for (i in 1:simIterations){
   initUnmixDistFromTruth <- c(initUnmixDistFromTruth, distWithPermutAndSgnChange(X=tweedieAlternateICAInfo$W, Y=trueW))
   
   finalUnmixDistFromTruth <- c(finalUnmixDistFromTruth, distWithPermutAndSgnChange(X=finalW, Y=trueW ))
+    
+  timeEnd <- Sys.time()
   
-  print(i)
+  print(paste("Iteration", i))
+  print(difftime(timeEnd, timeStart, units='mins'))
 
 }
 
@@ -602,9 +618,9 @@ if(!dir.exists(rootOutputDir)){
 ### THIS SECTION WILL CREATE A FILE DIRECTORY FOR SAVING SIMULATION DATA,
 ### CREATED ONE DIRECTORY ABOVE LOCATION OF THIS FILE. 
 
-distributionDirectory <- str_trim(paste(c("", "Abs")[(takeAbs ==TRUE)+1],
+distributionDirectory <- str_trim(paste(c("", "Abs")[(takeAbs ==TRUE)+1], paste(c("", "Symmetrized")[(makeSymmetric ==TRUE)+1],
     c("", "Mixture")[any(lengths(distributionParameters) > 1)+1], 
-                               str_replace(sim_params["distribution",], "^r", "")))
+                               str_replace(sim_params["distribution",], "^r", ""))))
 
 
 nodeName <- Sys.info()["nodename"]
