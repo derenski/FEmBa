@@ -90,6 +90,8 @@ perfect_covariance <- as.logical(sim_params["perfect_covariance", ])
 
 curveModelingMethod <- sim_params["curve modeling method", ]
          
+makeSymmetric <- as.logical(sim_params["make_symmetric", ])
+         
 takeAbs <- as.logical(sim_params["take_abs", ])
 
 Sigma_mu <- make_rho_mat(rho = rho_mu, p = p_mu)
@@ -198,7 +200,15 @@ if (takeAbs){
 
 ourPrior <- qarb(abs(do.call(chosen_prior, c(list(n=10000), distributionParameters)))     )
     
-    }else{
+    }else if (makeSymmetric){
+    
+    radOnes <- sample(c(-1,1), size=100000, replace=T, prob=c(.5, .5))
+    
+    ourPrior <- qarb(radOnes*do.call(chosen_prior, c(list(n=100000), 
+                                                       distributionParameters)))
+    
+    
+}else{
     
     ourPrior <- qarb(do.call(chosen_prior, c(list(n=10000), distributionParameters)))     
     
@@ -381,8 +391,8 @@ for (j in 1:iterations){
   print('Second FEmBA')
   
   thetas_tweedie_ICA <- tweedieCorrectionWithICAWarmStart(X=estimated_thetas, 
-                                                          Sigma_gamma=round(perturbed_covariance, 3),  ### Tweedie's formula with estimtated score function.
-                                     functionalBasis=modeling_basis,        ### Score function estimated with ICA approach
+            Sigma_gamma=round(perturbed_covariance, 3), 
+                                     functionalBasis=modeling_basis,       
                                      gridStep = .001, lambdaGrid=10^seq(-6, 6, 1),
                                      numberOfFolds = 5, numberOfKnotsScoreFunction = 8,
                                   algorithmSpecs=algorithmSpecs,
@@ -516,17 +526,13 @@ for (j in 1:iterations){
 apply(error_data, MARGIN=c(1,2,3), FUN=mean)[3,,]
 
 
-
+covTheta <- cov(t(estimated_thetas))
 
 OmegaEst <- U %*% matrixToPower(covTheta, -.5) %*% estimated_thetas
 
-
-
-
-norm(thetas_tweedie_trans-simulation_parameters$mu, 'F')
+norm(thetas_tweedie_fastICA-simulation_parameters$mu, 'F')
 norm(thetas_tweedie_ICA$tweedieEstimates-simulation_parameters$mu, 'F')
 
-thetas_tweedie_ICA$tweedieEstimates
 
 
 

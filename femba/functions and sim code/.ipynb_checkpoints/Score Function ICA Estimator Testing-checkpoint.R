@@ -274,8 +274,8 @@ finalUnmixDistFromTruth <- c()
          
 errorData <- array(NA, dim=c(4, 6, simIterations))
     
-dimnames(errorData)[[1]] <- c("Assumed Independence", "Decorrelated", "Standard ICA Approach", "Our ICA Approach") 
-
+dimnames(errorData)[[1]] <- c("\\fembant{}", "\\fembat{}", "\\fembafastICA{}", "\\fembajointICA{}") 
+         
 for (i in 1:simIterations){
   
   ### Iteration Start
@@ -284,46 +284,52 @@ for (i in 1:simIterations){
   ### Simulate data
   simulationData <- ICAmodelDataMaker(n=n_curves, p=p, quantile_func=theQuantileFunction, rho=.5, 
                                       rho_misspecification=rho_misspecification,
-                                      rho_gamma=.3)
+                                     rho_gamma=.3)
   
   ### Extract simulation parmeters
   XUnmixed <- simulationData$XUnmixed
   
-  X <- simulationData$X
+ X <- simulationData$X
   
   trueW <- simulationData$trueW
-  
-  sigmaTilde <- simulationData$sigmaTilde
-  
+    
   Sigma_gamma <- matrixToPower(simulationData$sigmaTilde, .5)
+    
+  modelingBasis <- diag(rep(1, dim(Sigma_gamma)[1]))
+    
+ # simulationData <- curve_generator_forceICA(n_obs=n_curves, Sigma_mu=make_rho_mat(rho=.5, p),
+  #                                          SNR=.5, sigma_e =0, 
+  #                                           unmixedCoordinateDist=theQuantileFunction,
+  #                                          times=seq(.01, 1, .01))  
+    
+  # XUnmixed <- simulationData$Wtheta %*% simulationData$theta
   
-  sigmaTildeMinusHalf <- matrixToPower(sigmaTilde, -.5)
+  #X <- simulationData$theta
+  
+  #trueW <- simulationData$Wtheta
+    
+  #Sigma_gamma <- simulationData$Sigma_gamma
+    
+  # modelingBasis <- simulationData$S
+  
   
   covThetaEst <- cov(t(X))
+    
+    ### If not using tweedie setting, set modelingBasis <- diag(rep(1, dim(Sigma_gamma)[1]))
   
   covThetaMinusHalfEst <- matrixToPower(covThetaEst, -.5)
   
-  trueWTilde <- simulationData$trueWTilde
-  
-  cTrueWTilde <- simulationData$cTrueWTilde
-  
-  X <- simulationData$X
-  
-  trueTweedieCorrectionInfo <- tweediesFormulaOracle(X=X, W=trueW, U=trueWTilde %*% solve(sigmaTildeMinusHalf),
-                                                     Sigma_gamma=Sigma_gamma, 
-                                                  functionalBasis=diag(rep(1, dim(Sigma_gamma)[1])), 
-                                                     gridStep = .001, 
-                                                  lambdaGrid=10^seq(-6, 3, 1),
-                                                  numberOfFolds = 2, 
-                                                  numberOfKnotsScoreFunction = 8,
-                                                  maxIterations=100)
+  trueTweedieCorrectionInfo <- tweediesFormulaOracle(X=X, W=trueW, U=trueW %*% solve(covThetaMinusHalfEst), Sigma_gamma=Sigma_gamma, 
+                                                  functionalBasis=modelingBasis, 
+                                             gridStep = .001, lambdaGrid=10^seq(-6, 3, 1), numberOfFolds = 2, 
+                                                  numberOfKnotsScoreFunction = 8, maxIterations=100)
   
   trueScoreValues <- trueTweedieCorrectionInfo$tweedieEstimates
   
   ### Score function estimation assuming coordinates of X are independent
   
   assumedIndependentInfo <- tweedieCorrectionNonJointICA(X=X, Sigma_gamma=Sigma_gamma,  ### Tweedie without joint unmixing and score function estimation
-                                     functionalBasis=diag(rep(1, dim(Sigma_gamma)[1])),  
+                                     functionalBasis=modelingBasis,  
                                      transformation="none",
                                      gridStep = .001, 
                                      lambdaGrid=10^seq(-6, 3, 1),
@@ -337,7 +343,7 @@ for (i in 1:simIterations){
   
   uncorrelatedAssumedIndependentInfo <- tweedieCorrectionNonJointICA(X=X, 
                                      Sigma_gamma=Sigma_gamma,  
-                                     functionalBasis=diag(rep(1, dim(Sigma_gamma)[1])),  
+                                     functionalBasis=modelingBasis,  
                                      transformation="decorrelate",
                                      gridStep = .001, 
                                      lambdaGrid=10^seq(-6, 3, 1),
@@ -349,7 +355,7 @@ for (i in 1:simIterations){
     
   tweedieAlternateICAInfo <-   tweedieCorrectionNonJointICA(X=X, 
                                      Sigma_gamma=Sigma_gamma,  ### Tweedie without joint unmixing and score function estimation
-                                     functionalBasis=diag(rep(1, dim(Sigma_gamma)[1])),  
+                                     functionalBasis=modelingBasis,  
                                      transformation="ica", gridStep = .001, 
                                      lambdaGrid=10^seq(-6, 3, 1), numberOfFolds = 2, 
                                      numberOfKnotsScoreFunction = 8)
@@ -372,7 +378,7 @@ for (i in 1:simIterations){
     
     
     ourMethodResults <- tweedieCorrectionWithICAWarmStart(X, Sigma_gamma=Sigma_gamma,  ### Tweedie's formula with estimtated score function.
-                                     functionalBasis=diag(rep(1, dim(Sigma_gamma)[1])),        ### Score function estimated with ICA approach
+                                     functionalBasis=modelingBasis,        ### Score function estimated with ICA approach
                                      gridStep = .001, lambdaGrid=10^seq(-6, 3, 1),
                                      numberOfFolds = 2, numberOfKnotsScoreFunction = 8,
                                   algorithmSpecs=algorithmSpecs,
@@ -595,6 +601,15 @@ performanceForDisplay <- performanceTable[, c(1,4)]
 
 ### Table of performance metrics
 performanceTableLatex <- kable(performanceForDisplay, "latex", booktabs = T)
+                                                    
+fixed_table <- str_replace_all(performanceTableLatex, pattern = "textbackslash\\{\\}",
+                               replace='')
+      
+fixed_table <- str_replace_all(fixed_table, pattern = '\\\\(?=(\\{|\\}))', replace='') 
+
+fixed_table <- str_replace_all(fixed_table, pattern = "toprule|midrule|bottomrule",
+                               replace='hline')                                                    
+                                                    
 
 ### Boxplot of performance values
 performancePlot <- (ggplot(performanceData, aes(x=Method, y=MSE_that_iteration, fill=Method)) + 
@@ -670,7 +685,7 @@ ggsave(plot=unmixedCoordinateExamplePlot ,
 
 
 fileConn<-file(paste(outputDirectory, "Performance MSE Table.txt", sep='/'))
-writeLines(performanceTableLatex, fileConn)
+writeLines(fixed_table, fileConn)
 close(fileConn)
 
 fileConn<-file(paste(outputDirectory, "Unmixing Matrix Distance Table.txt", sep='/'))

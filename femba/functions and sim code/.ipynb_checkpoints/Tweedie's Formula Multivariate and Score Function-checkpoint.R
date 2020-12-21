@@ -402,7 +402,7 @@ tweedieCorrectionWithICAWarmStart <- function(X, Sigma_gamma,  ### Tweedie's for
   
   basisCovarianceMatrix <- ((t(functionalBasis) %*% ### Term calculated from basis used to model curves
                                functionalBasis
-                             /dim(functionalBasis)[1]))
+                             ))/dim(functionalBasis)[1]
   
   sigmaTilde <- (Sigma_gamma %*% 
                    basisCovarianceMatrix %*% Sigma_gamma) ### Sigma tilde
@@ -592,9 +592,7 @@ scoreFunctionWithICA <- function(thetaMatrix, sigmaTilde, UInit, lambdaGrid=10^s
   risk_t <- evaluateRisk(thetas=thetaMatrix, unmixedScoreFunction=psi_tVector, SigmaTilde=sigmaTilde,
                         W=Wt)
   
-  mixedScoreVals_t <- t(Wt) %*% unmixedScoreVals_t
-  
-  print(paste("Initial Risk:", risk_t))                
+  mixedScoreVals_t <- t(Wt) %*% unmixedScoreVals_t              
                   
   for (iterator in 1:algorithmSpecs["max_iterations"]){
 
@@ -678,9 +676,7 @@ scoreFunctionWithICA <- function(thetaMatrix, sigmaTilde, UInit, lambdaGrid=10^s
     
   }
     
-  ### Return final U needed for calculating unmixing matrices, and the score vector
-                           
-    print(paste("Final Risk:", risk_tPlusOne))                       
+  ### Return final U needed for calculating unmixing matrices, and the score vector                    
     
     UandScoreVec <- list(UtPlusOne, psi_tPlusOneVector)
     
@@ -925,233 +921,7 @@ unmixingMatrixUpdate <- function(thetaStarMatrix, UInit, sigmaTilde,
   
 }
 
-
-
-
-
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-if (FALSE){ ### OLD SCORE FUNCTION ESTIMATOR, COMMENTED OUT                          
-
-
-#### Update Score function
-
-scoreFunctionUpdate <- function(Z, cW, lambdaGrid=10^seq(-6, 6, 1), numKnots=10, gridStep=.01,
-                                    nFolds=5){
-  
-  ### Calculates the risk
-  riskCalculator <- function(Z, betaHat, basis, lambda, cW, gridStep){
-    
-    n <- length(Z)
-    
-    sOfZ <- predict(basis, newx = Z)
-    
-    sMatrix <- base::crossprod(sOfZ)/n
-    
-    basisFirstDerivative <- deriv(basis, derivs = 1L)
-    
-    sPrimeOfZ <- predict(basisFirstDerivative, newx = Z)
-    
-    sPrimeVec <- matrix(rowMeans(t(sPrimeOfZ)), nrow=dim(sPrimeOfZ)[2], ncol=1)
-    
-    basisSecondDerivative <- deriv(basis, derivs = 2L)
-    
-    omega <- gridStep*base::crossprod(basisSecondDerivative)
-    
-    riskValue <- cW*t(betaHat) %*% (sMatrix+lambda*omega) %*% betaHat + 2*cW * t(sPrimeVec) %*% betaHat
-    
-    return(riskValue)
-    
-  }
-  
-  ### Calculates the basis coefficient vector for the score function
-  betaCalculator <- function(Z, basis, lambda, cW, gridStep){
-    
-    n <- length(Z)
-    
-    sOfZ <- predict(basis, newx = Z)
-    
-    sMatrix <- base::crossprod(sOfZ)/n
-    
-    basisFirstDerivative <- deriv(basis, derivs = 1L)
-    
-    sPrimeOfZ <- predict(basisFirstDerivative, newx = Z)
-    
-    sPrimeVec <- matrix(rowMeans(t(sPrimeOfZ)), nrow=dim(sPrimeOfZ)[2], ncol=1)
-    
-    basisSecondDerivative <- deriv(basis, derivs = 2L)
-    
-    omega <- gridStep*base::crossprod(basisSecondDerivative)
-    
-    betaHat <- -1*cW*solve(cW*sMatrix+lambda*omega) %*% sPrimeVec
-    
-    return(betaHat)
-    
-  }
-  
-  ### If bigger than 1, perform cross validation, otherwise estimate from given turning parameter
-  CV <- length(lambdaGrid) > 1
-    
-    
-  if (CV & (nFolds==1)){
-      
-      stop("Must have multiple folds if doing CV.")
-      
-  }
-  
-  ### Number of curves
-  n <- length(Z) 
-  
-  num_knots_plus_1 <- numKnots+1 ### Give the number of knots, plus 1
-  
-  theProbs <- seq(1:(num_knots_plus_1-1))/(num_knots_plus_1)
-  
-  theKnots <- quantile(Z, probs = theProbs) ### Knots based on quantiles
-  
-  ### Making sure knots are not placed are extreme points in the data
-  if (min(theKnots) == min(Z)){
-    
-    theKnots[which(theKnots==min(Z))] <- min(Z[which(Z != min(Z))])
-    
-    
-  }
-  
-  if (max(theKnots) == max(Z)){
-    
-    theKnots[which(theKnots==max(Z))] <- min(Z[which(Z != max(Z))])
-    
-    
-  }
-  
-  ### Generating the basis to be used to represent the score function
-  theKnots <- unique(theKnots)
-  
-  zMin <- floor(min(Z, na.rm = T))
-  
-  zMax <- ceiling(max(Z, na.rm = T))
-  
-  zGrid <- seq(zMin, zMax,  gridStep)
-
-  basis<- bSpline(seq(zMin,zMax,gridStep), degree = min(3,n), 
-                         knots = theKnots, intercept = T) ### use knots
-    
-    #### number of knots = df-degree
-   #### Specify knots to be at quantiles 
-  
-  df <- num_knots_plus_1+min(3,n)
-  
-  if (CV){ ### Cross-validation for tuning parameter estimation
-    
-    cvFolds <- createFolds(1:n, k =nFolds)
-    
-    ### Cross validation done in parallel
-    cvErrorsForLambdas <- foreach(lamb=lambdaGrid,
-                .packages=c('splines2', "caret"), .combine = 'c') %dopar% {
-      
-      risksThisLambda <- c()
-      
-      cvFolds <- createFolds(1:n, k =nFolds)
-      
-      for (fold in cvFolds){
-      
-        trainZ <- Z[-fold]
-        
-        valZ <- Z[fold]
-      
-        betaHatThisFoldThisLambda <- betaCalculator(Z=trainZ, basis=basis, lambda=lamb, cW=cW, gridStep=gridStep)
-        
-        riskThisFoldThisLambda <- riskCalculator(Z=valZ, betaHat=betaHatThisFoldThisLambda,
-                                                 basis=basis, lambda=lamb, cW=cW, gridStep=gridStep)
-        
-        risksThisLambda <- c(risksThisLambda, riskThisFoldThisLambda)
-      
-      }
-     
-      mean(risksThisLambda)
-       
-    }
-    
-    chosenLambda <- lambdaGrid[which.min(cvErrorsForLambdas)]
-    
-  }else{
-    
-    chosenLambda <- lambdaGrid
-    
-  }
-  
-  betaHat <- betaCalculator(Z=Z, basis=basis, lambda=chosenLambda, cW=cW, gridStep=gridStep)
-  
-  ### The estimated score function that gets returned
-  scoreFunction <- function(z, derivativeOrder=0){
-    
-    if (derivativeOrder==0){
-      
-      basisNow = basis
-      
-    }else{
-    
-    basisNow <- deriv(basis, derivs = derivativeOrder)
-    
-    }
-    
-    basisVec = predict(basisNow, newx = z)
-    
-    return(basisVec %*% betaHat)
-    
-  }
-  
-  force(scoreFunction)
-  
-  return(scoreFunction)
-  
-}
-
-} #### OLD SCORE FUNCTION ESTIMATOR, COMMENTED OUT
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
-                           
+               
                            
                            
                            
@@ -1291,10 +1061,10 @@ scoreFunctionUpdate <- function(Z, W, SigmaTilde, lambdaGrid=10^seq(-6, 6, 1),
   cW <- array(apply(W, MARGIN=1, FUN=function(x) t(oneVec) %*% ( SigmaTilde * x %*% t(x) ) %*% oneVec), dim=c(length(oneVec), 1))
       
   n <- dim(Z)[2]
+                    
+  oneMatrixForKronecker <- array(1, dim=rep(dim(bases[[1]])[2], 2))
       
-  WSigmaTildeTWBigChungus <-  apply(t(apply(WSigmaTildeTW, MARGIN=1, 
-                                              FUN=rep, each=dim(bases[[1]])[2])), 
-                                      MARGIN=2, FUN=rep, each=dim(bases[[1]])[2])
+  WSigmaTildeTWKronecker <-  kronecker(WSigmaTildeTW, oneMatrixForKronecker)
     
   allTheEvals <- alply(Z, 2, basisEvalInLongVec, basisList=bases)
       
@@ -1306,7 +1076,7 @@ scoreFunctionUpdate <- function(Z, W, SigmaTilde, lambdaGrid=10^seq(-6, 6, 1),
                              
   basesSecondDerivs <- lapply(bases, FUN=deriv, derivs=2L)
                              
-  T1 <- WSigmaTildeTWBigChungus*Reduce('+', allTheCrossProds)/length(allTheCrossProds)
+  T1 <- WSigmaTildeTWKronecker*Reduce('+', allTheCrossProds)/length(allTheCrossProds)
       
   T2 <- Reduce("+", derivEvals)/length(derivEvals) 
     
@@ -1330,9 +1100,9 @@ scoreFunctionUpdate <- function(Z, W, SigmaTilde, lambdaGrid=10^seq(-6, 6, 1),
         
         valZ <- Z[, fold]
           
-        T1Train <- WSigmaTildeTWBigChungus*Reduce('+', allTheCrossProds[-fold])/length(allTheCrossProds[-fold])
+        T1Train <- WSigmaTildeTWKronecker*Reduce('+', allTheCrossProds[-fold])/length(allTheCrossProds[-fold])
           
-        T1Val <- WSigmaTildeTWBigChungus*Reduce('+', allTheCrossProds[fold])/length(allTheCrossProds[fold])
+        T1Val <- WSigmaTildeTWKronecker*Reduce('+', allTheCrossProds[fold])/length(allTheCrossProds[fold])
       
         T2Train <- Reduce("+", derivEvals[-fold])/length(derivEvals[-fold]) 
           

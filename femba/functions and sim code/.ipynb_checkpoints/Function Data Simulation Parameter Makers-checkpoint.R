@@ -338,7 +338,7 @@ curve_generator_forceICA <- function(n_obs, Sigma_mu, SNR,
   e_noise <- rmvnorm(n_obs, mean = rep(0,length(times)),
                      sigma  = sigma_e*diag(length(times)))  
   
-  final_output <- list(mu=solve(Wtheta) %*% Omegas, omega= Omegas + gammas, 
+  final_output <- list(mu=solve(Wtheta) %*% Omegas, Wtheta=Wtheta, omega= Omegas + gammas, 
                        theta=thetas, U=U, S=S, Xs=Xs, Sigma_gamma=((1/SNR))*(Atheta %*% t(Atheta)), 
                        white_noise=e_noise)
   
