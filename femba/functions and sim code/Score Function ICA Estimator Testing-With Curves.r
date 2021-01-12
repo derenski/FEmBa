@@ -165,7 +165,6 @@ num_restarts <- as.numeric(sim_params['num_restarts', ])
 rho_mu <- as.numeric(sim_params["rho_mu", ])
 
 ### Creates Sigma_mu
-Sigma_mu <- make_rho_mat(rho_mu, p)
          
 takeAbs <- as.logical(sim_params["take_abs", ])
          
@@ -187,6 +186,8 @@ numberOfKnotsScoreFunction = 8
 
 nFolds <- 5
 
+Sigma_mu <- make_rho_mat(rho_mu, p)
+
 algorithmSpecs=c(min_iterations=as.numeric(sim_params["min_iterations_algorithm", ]), 
                  max_iterations=as.numeric(sim_params["max_iterations_algorithm", ]), 
                  min_change=as.numeric(sim_params["min_change_algorithm", ]))
@@ -194,6 +195,8 @@ algorithmSpecs=c(min_iterations=as.numeric(sim_params["min_iterations_algorithm"
 updateUSpecs=c(min_iterations=as.numeric(sim_params["min_iterations_Uupdate", ]), 
                  max_iterations=as.numeric(sim_params["max_iterations_Uupdate", ]), 
                  min_change=as.numeric(sim_params["min_change_Uupdate", ]))   
+
+
 
 ### This is where you can experiment with different priors.
 ### I would suggest settng the variables "takeAbs" and "makeSymmetric"
