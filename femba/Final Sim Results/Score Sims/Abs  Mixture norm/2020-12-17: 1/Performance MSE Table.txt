@@ -1,0 +1,11 @@
+
+\begin{tabular}{ll}
+\hline
+Method & MSE (SE)\\
+\hline
+\fembafastICA{} & 0.734 (0.039)\\
+\fembajointICA{} & 0.608 (0.038)\\
+\fembant{} & 4.911 (0.087)\\
+\fembat{} & 4.606 (0.085)\\
+\hline
+\end{tabular}
