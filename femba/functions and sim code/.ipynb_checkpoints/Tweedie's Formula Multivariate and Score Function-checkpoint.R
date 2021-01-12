@@ -2,12 +2,15 @@
 ####### bias correction.
 library(caret)
 library(splines2)
+library(MASS)
+library(lava)
 library(matrixcalc)
 library(pracma)
 library(expm)
 library(doParallel)
 library(foreach)
 library(plyr)
+library(fastICA)
 
 source("Function Data Simulation Parameter Makers.R")
 
@@ -396,7 +399,8 @@ tweedieCorrectionWithICAWarmStart <- function(X, Sigma_gamma,  ### Tweedie's for
                                      numberOfFolds = 5, 
                                      numberOfKnotsScoreFunction = 8,
                                   algorithmSpecs=c(min_iterations=10, max_iterations=100, min_change=1e-06),
-                                  updateUSpecs=c(min_iterations=10, max_iterations=100, min_change=1e-06)){
+                                  updateUSpecs=c(min_iterations=10, max_iterations=100, min_change=1e-06),
+                                             learningRateU=.2){
     
     options(warn=-1)   
   
@@ -428,7 +432,8 @@ tweedieCorrectionWithICAWarmStart <- function(X, Sigma_gamma,  ### Tweedie's for
                                           UInit=UWarmStart, lambdaGrid=lambdaGrid, 
                                           numKnots=numberOfKnotsScoreFunction, gridStep=gridStep,
                                           nFolds=numberOfFolds, maxIterations=maxIterations,
-                                          algorithmSpecs=algorithmSpecs, updateUSpecs=updateUSpecs)
+                                          algorithmSpecs=algorithmSpecs, updateUSpecs=updateUSpecs,
+                                                        learningRateU=learningRateU)
 
           ### The U in so(p) that is used in calculating W, and W tilde
     finalU <- scoreFunctionAndUnmixingMatrix$U
@@ -506,7 +511,8 @@ tweedieCorrectionWithICAWarmStart <- function(X, Sigma_gamma,  ### Tweedie's for
 scoreFunctionWithICA <- function(thetaMatrix, sigmaTilde, UInit, lambdaGrid=10^seq(-6, 6, 1), numKnots=5, 
             gridStep=.01, nFolds=5, maxIterations=200, maxIterationsUpdateU=100,
             algorithmSpecs=c(min_iterations=10, max_iterations=100, min_change=1e-06),
-            updateUSpecs=c(min_iterations=10, max_iterations=100, min_change=1e-06)){ ## thetaMatrix is p times n
+            updateUSpecs=c(min_iterations=10, max_iterations=100, min_change=1e-06),
+                                learningRateU=.2){ ## thetaMatrix is p times n
     
         ## You can use this to evaluate the risk for the UNTRANSFORMED data (compare fastICA's risk to yours)
     evaluateRisk <- function(thetas, unmixedScoreFunction, SigmaTilde, W){
@@ -608,7 +614,8 @@ scoreFunctionWithICA <- function(thetaMatrix, sigmaTilde, UInit, lambdaGrid=10^s
                                     scoreFunctionVectorInit=psi_tVector, 
                                     minIterationsU = updateUSpecs["min_iterations"],
                                     maxIterationsU = updateUSpecs["max_iterations"],
-                                    minChangeU = updateUSpecs["min_change"])
+                                    minChangeU = updateUSpecs["min_change"],
+                                     alpha=learningRateU)
     
     ### The new W
     WtPlusOne <- UtPlusOne %*% covThetaMinusHalf
@@ -733,7 +740,7 @@ scoreFunctionWithICA <- function(thetaMatrix, sigmaTilde, UInit, lambdaGrid=10^s
 
 unmixingMatrixUpdate <- function(thetaStarMatrix, UInit, sigmaTilde,
                                  scoreFunctionVectorInit, minIterationsU=10, maxIterationsU=100,
-                                 minChangeU=1e-06){
+                                 minChangeU=1e-06, alpha=.2){
     
   Gamma <- cov(t(thetaStarMatrix))
     
@@ -839,8 +846,6 @@ unmixingMatrixUpdate <- function(thetaStarMatrix, UInit, sigmaTilde,
   UtMinus1 <- UInit
   
   dist <- 1
-  
-  alpha <- .2
   
   etaGrid <-10*c(.5^seq(0, 15, 1), 0)
   

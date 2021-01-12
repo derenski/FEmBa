@@ -26,6 +26,12 @@ library(sn)
 source("Function Data Simulation Parameter Makers.R")
 source("Tweedie's Formula Multivariate and Score Function.R")
 
+averagedVectorl2Norm <- function(X,Y){
+    
+    return((norm(X-Y,'F')^2)/dim(Y)[2])
+    
+}
+
 
 desired_clusters <- 8
 
@@ -148,6 +154,8 @@ ICAmodelDataMaker <- function(n, p, quantile_func, rho=.5, rho_misspecification=
   XUnmixed <- norta(n, corr_mat = misspecificationMat, distribution = quantile_func)
   
   XUnmixed <- matrixToPower(cov(t(XUnmixed)), -.5)  %*% XUnmixed
+    
+  XUnmixed <- XUnmixed - t(sapply(rowMeans(XUnmixed), rep, each=dim(XUnmixed)[2]))
     
   ### The observed, mixed data
   X <- solve(trueW) %*% XUnmixed 
@@ -296,21 +304,6 @@ for (i in 1:simIterations){
   Sigma_gamma <- matrixToPower(simulationData$sigmaTilde, .5)
     
   modelingBasis <- diag(rep(1, dim(Sigma_gamma)[1]))
-    
- # simulationData <- curve_generator_forceICA(n_obs=n_curves, Sigma_mu=make_rho_mat(rho=.5, p),
-  #                                          SNR=.5, sigma_e =0, 
-  #                                           unmixedCoordinateDist=theQuantileFunction,
-  #                                          times=seq(.01, 1, .01))  
-    
-  # XUnmixed <- simulationData$Wtheta %*% simulationData$theta
-  
-  #X <- simulationData$theta
-  
-  #trueW <- simulationData$Wtheta
-    
-  #Sigma_gamma <- simulationData$Sigma_gamma
-    
-  # modelingBasis <- simulationData$S
   
   
   covThetaEst <- cov(t(X))
@@ -382,7 +375,8 @@ for (i in 1:simIterations){
                                      gridStep = .001, lambdaGrid=10^seq(-6, 3, 1),
                                      numberOfFolds = 2, numberOfKnotsScoreFunction = 8,
                                   algorithmSpecs=algorithmSpecs,
-                                  updateUSpecs=updateUSpecs)  
+                                  updateUSpecs=updateUSpecs,
+                                                         learningRateU=.2)  
     
     
                                                   
@@ -452,7 +446,8 @@ WOurMethodTheta <- finalW %*% X
 unmixedOurICACurves <- solve(t(finalW)) %*% solve(Sigma_gamma) %*%  (scoreValuesOurMethod-X)
          
 WTrueTheta <- trueW %*% X 
-unmixedTrueCurves <- solve(t(trueW)) %*% solve(Sigma_gamma) %*%  ( trueScoreValues-X)         
+         
+unmixedTrueCurves <- solve(t(trueW)) %*% solve(Sigma_gamma) %*%  (trueScoreValues-X)         
          
 unmixedAlternateICA <- WAlternateICATheta[coordinateForPlotting, ]         
          
@@ -619,11 +614,11 @@ performancePlot <- (ggplot(performanceData, aes(x=Method, y=MSE_that_iteration, 
                             axis.ticks.x=element_blank()) +ylab("MSE")
                     + ggtitle("MSE for Score Function Estimation"))
 
-rootOutputDir <- "../score_performance_reports"
+rootOutputDir <- "../reports/score_performance_reports"
 
 if(!dir.exists(rootOutputDir)){
   
-  dir.create(rootOutputDir)
+  dir.create(rootOutputDir, recursive=TRUE)
   
   
 }

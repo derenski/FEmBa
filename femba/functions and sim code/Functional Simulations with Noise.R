@@ -222,6 +222,9 @@ theMisspessMat <- make_rho_mat(0, dim(Sigma_mu)[1])
 
 # Theta satisfies ICA
          
+### only for fastICA, joint ica
+riskArray <- array(NA, dim=c(2, iterations))         
+         
          
 ############################################################### POINT OF NO RETURN
 for (j in 1:iterations){
@@ -292,7 +295,7 @@ for (j in 1:iterations){
       
     chosen_df <- min(dim(cov_gamma)[1], dim(Sigma_mu)[1])
       
-    modeling_basis <- simulation_parameters$S
+    modeling_basis <- 10*simulation_parameters$S
     
     correctionSample <- seq(1, full_n, 1)
     
@@ -396,7 +399,8 @@ for (j in 1:iterations){
                                      gridStep = .001, lambdaGrid=10^seq(-6, 6, 1),
                                      numberOfFolds = 5, numberOfKnotsScoreFunction = 8,
                                   algorithmSpecs=algorithmSpecs,
-                                  updateUSpecs=updateUSpecs)  
+                                  updateUSpecs=updateUSpecs,
+                                    learningRateU=.01)  
   
   ## plot((thetas_tweedie_ICA-estimated_thetas)[2,] ~ estimated_thetas[2,])
   
@@ -448,6 +452,17 @@ for (j in 1:iterations){
   oracle_curves_notrans <- t(modeling_basis %*% thetas_oracle)
     
     
+  riskEstimateFastICA <- ((norm(thetas_tweedie_fastICA-thetas_oracle, 'F')^2)/prod(dim(thetas_oracle)))/dim(thetas_oracle)[2]
+    
+  riskEstimateJointICA <- ((norm(thetas_tweedie_ICA$tweedieEstimates-thetas_oracle, 'F')^2)/prod(dim(thetas_oracle)))/dim(thetas_oracle)[2]
+    
+    
+  riskArray[,j] <- c(riskEstimateFastICA, riskEstimateJointICA)
+    
+    
+ 
+    
+    
   #, fast_ica_only=fast_ica_only_curves  
 
   all_curves <- list(actual=actual_curves, tweedie_trans=tweedie_curves_trans, tweedie_notrans=tweedie_curves_notrans,
@@ -484,8 +499,8 @@ for (j in 1:iterations){
   
   curves_of_interest <- lapply(all_curves, FUN=function(x) x[order(l2_smoothed, 
         decreasing = T)[1:top_k_values], ]) ## Look for largest initial norm
-  
-  ### THIS IS NOT CORRECT, FIX THIS!!!!!!! 
+
+                               
   l2_dist_data <- sapply(curves_of_interest, FUN=bias_variance_mse, 
                          y=curves_of_interest[["actual"]])
   
@@ -503,6 +518,9 @@ for (j in 1:iterations){
                                      sep="")
     
   }
+                               
+                               
+                               
   
   error_data[, , , j] <- error_array_this_iteration
   
@@ -515,6 +533,19 @@ for (j in 1:iterations){
   print(difftime(timeEnd, timeStart, units='mins'))
                                
 }
+                               
+rownames(riskArray) <- c("\\fembafastICA{}", "\\fembajointICA{}")
+                               
+colnames(riskArray) <- paste('iteration', 1:iterations, sep='_')
+                               
+meltedRiskArray <- reshape::melt(riskArray)
+                               
+names(meltedRiskArray) <- c('Method', 'Iteration', 'Risk')
+                               
+riskTableForLatex <- (meltedRiskArray %>% group_by(Method) %>% dplyr::summarize(SE = mean(Risk)/n(), Risk=mean(Risk)) %>% 
+                     mutate(`Risk (SE)` = paste(round(Risk, 10), ' (', round(SE, 10), ')',
+
+
 
 
 #apply(error_data, MARGIN=c(1,2,3), FUN=mean)
@@ -538,12 +569,12 @@ norm(thetas_tweedie_ICA$tweedieEstimates-simulation_parameters$mu, 'F')
 
 
 
-report_dir <- paste("../reports",nodeName, sep="/")
+report_dir <- paste("../reports/curve_estimation_reports",nodeName, sep="/")
 
 
 if (!exists(report_dir)){
   
-  dir.create(report_dir, recursive = T)
+  dir.create(report_dir, recursive = TRUE)
   
 }
 
@@ -573,9 +604,10 @@ if (!dir.exists(output_dir)){
   
 }
 
-
-
-
+                                                
+fileConn<-file(paste(table_dir,'risk_fast_and_joint_ica.txt', sep="/"))
+    writeLines(riskTableForLatex, fileConn)
+    close(fileConn)
 
 
 ## Get score function example

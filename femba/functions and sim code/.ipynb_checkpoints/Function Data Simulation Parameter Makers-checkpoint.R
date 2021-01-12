@@ -307,6 +307,8 @@ curve_generator_forceICA <- function(n_obs, Sigma_mu, SNR,
     
     ### True unmixing matrix
     trueW <- UTrue %*% covMatMinusHalf
+      
+    XUnmixed <- XUnmixed - t(sapply(rowMeans(XUnmixed), rep, each=dim(XUnmixed)[2]))
     
     finalOutput <- list(Omega=XUnmixed, W=trueW)
     
@@ -326,20 +328,32 @@ curve_generator_forceICA <- function(n_obs, Sigma_mu, SNR,
   Wtheta <- icaModelData$W
   
   U <- icaModelData$W %*% matrixToPower(Sigma_mu, .5)
-  
-  gammas <- (1/sqrt(SNR))*norta(n_obs=n_obs, corr_mat=diag(rep(1, p)))
+    
+  deltaCovTerm <- make_rho_mat(rho=.2, p=p)  
+    
+  deltaMatrix <- norta(n_obs=n_obs, corr_mat=deltaCovTerm)  
+    
+  gammas <- norta(n_obs=n_obs, corr_mat=diag(rep(1, p)))
     
   Atheta <- solve(Wtheta)
+    
+  ### Keep the SNR part on the Omega part only, so that the delta's cancel out  
+  #unmixedPriorPart <- sqrt(SNR)*Omegas+deltaMatrix
+  #unmixedGaussianPart <- gammas-deltaMatrix
+    
+  unmixedPriorPart <- sqrt(SNR)*Omegas
+  unmixedGaussianPart <- gammas
                                 
-  thetas <- Atheta %*% (Omegas + gammas)
+  thetas <- Atheta %*% (unmixedPriorPart+unmixedGaussianPart)
   
   Xs <- t(S %*% thetas)
 
   e_noise <- rmvnorm(n_obs, mean = rep(0,length(times)),
                      sigma  = sigma_e*diag(length(times)))  
   
-  final_output <- list(mu=solve(Wtheta) %*% Omegas, Wtheta=Wtheta, omega= Omegas + gammas, 
-                       theta=thetas, U=U, S=S, Xs=Xs, Sigma_gamma=((1/SNR))*(Atheta %*% t(Atheta)), 
+  final_output <- list(mu= sqrt(SNR)* (Atheta %*% unmixedPriorPart)    ,
+                       Wtheta=Wtheta, omega= Wtheta %*% thetas, 
+                       theta=thetas, U=U, S=S, Xs=Xs, Sigma_gamma=(Atheta %*% t(Atheta)), 
                        white_noise=e_noise)
   
   return(final_output)
