@@ -160,8 +160,12 @@ n_curves <- as.numeric(sim_params['n_curves', ])
          
 num_restarts <- as.numeric(sim_params['num_restarts', ])
          
-rho_misspecification <- as.numeric(sim_params["rho_misspecification", ])
-         
+
+### This sets the correlation parameter for mu. Set to zero for independent coordinates
+rho_mu <- as.numeric(sim_params["rho_mu", ])
+
+### Creates Sigma_mu
+Sigma_mu <- make_rho_mat(rho_mu, p)
          
 takeAbs <- as.logical(sim_params["take_abs", ])
          
@@ -271,7 +275,7 @@ initUnmixDistFromTruth <- c()
 finalUnmixDistFromTruth <- c()
          
 
-Sigma_mu <- make_rho_mat(.5, p)
+
 
 for (snr in SNRs){    
     
@@ -301,7 +305,7 @@ for (snr in SNRs){
           ### Iteration Start
           timeStart <- Sys.time() ### Keeping track of how long things take to run
 
-          simulationData <- curve_generator_forceICA(n_obs=n_curves, Sigma_mu=make_rho_mat(.5, p),
+          simulationData <- curve_generator_forceICA(n_obs=n_curves, Sigma_mu=Sigma_mu, 
                                                     SNR=snr, sigma_e =0,  ### Generating data
                                                     unmixedCoordinateDist=theQuantileFunction,
                                                    times=seq(.01, 1, .01))  
@@ -323,9 +327,12 @@ for (snr in SNRs){
 
           covThetaMinusHalfEst <- matrixToPower(covThetaEst, -.5)
 
-          oracleTweedieValues <- oracle_estimator(the_thetas=X, ### Oracle estimator
-                                      Sigma_mu=make_rho_mat(rho=0, p), Sigma_g=Sigma_mu,
-                                      the_mus=simulationData$mu)
+          oracleTweedieInfo <- tweediesFormulaOracle(X=X, W=trueW, U=trueW %*% solve(covThetaMinusHalfEst), Sigma_gamma=Sigma_gamma, 
+                                                  functionalBasis=modelingBasis, 
+                                             gridStep = .001, lambdaGrid=10^seq(-6, 3, 1), numberOfFolds = 2, 
+                                                  numberOfKnotsScoreFunction = 8, maxIterations=100)
+            
+          oracleTweedieValues <- oracleTweedieInfo$tweedieEstimates
 
           ### Score function estimation assuming coordinates of X are independent
 
@@ -414,13 +421,13 @@ for (snr in SNRs){
             
             
             ### Error, oracle tweedie to truth  
-          riskTweedieToOracle <- errorsThisIterationCurves
+          riskTweedieToTruth <- errorsThisIterationCurves
             
           riskOracleToTruth <- averagedVectorl2Norm(X=oracleCurvesThisIteration, Y=t(simulationData$S %*% simulationData$mu))
             
           riskOracleToTruth <- sapply(riskOracleToTruth, FUN=rep, each=length(methodNames))
             
-          aggRelativeRisksThisIteration <- rowMeans((riskTweedieToOracle-riskOracleToTruth)/riskOracleToTruth)
+          aggRelativeRisksThisIteration <- rowMeans((riskTweedieToTruth-riskOracleToTruth)/riskOracleToTruth)
             
             
             
