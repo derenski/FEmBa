@@ -313,7 +313,7 @@ tweedieCorrectionWithICARandomRestart <- function(X, Sigma_gamma,  ### Tweedie's
                                
   UInits <- lapply(1:numRestarts, FUN=function(x) gramSchmidt(array(rnorm(dim(X)[1]^2), dim=rep(dim(X)[1], 2)))$Q)   
 
-  risksRestarts <- foreach(UInit=UInits, .combine=c, .packages=c("doParallel", "foreach", "splines2", "caret"),
+  risksRestarts <- foreach(UInit=UInits, .combine=c, .packages=c("doParallel", "foreach", "splines2", "caret", "lava"),
                           .export=c("scoreFunctionWithICA", "matrixToPower", "scoreFunctionUpdate",
                                    "unmixingMatrixUpdate")) %dopar% {                             
       

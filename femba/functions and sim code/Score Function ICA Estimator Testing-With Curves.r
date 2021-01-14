@@ -37,7 +37,7 @@ registerDoParallel(cl)
 
 tableFixer <- function(badLatex){ ### Fixes tables that have a bad latex representation
     
-    fixed_table <- as.character(aggMeltedPerformanceDataBySNRScoreFunctionForLatex)
+    fixed_table <- as.character(badLatex)
     
     fixed_table <- str_replace_all(badLatex, pattern = "textbackslash\\{\\}",
                                replace='')
@@ -236,8 +236,10 @@ if (takeAbs){
 ### Generates the quantile function from the sample
 theQuantileFunction <- qarb(bigSample) 
 
+truehist(bigSample)
+
 # c(.1, .25, .5, 1, 4, 9, 16, 25, 36)  
-SNRs <- c(.1, .25, .5, 1, 4, 9, 16, 25, 36)  ### Various SNR's for which to calculate risk, L2-norm, etc.
+SNRs <- c(.25, .5, 1, 4)  ### Various SNR's for which to calculate risk, L2-norm, etc.
 
 methodNames <- c("\\fembant{}", "\\fembat{}", "\\fembafastICA{}", "\\fembajointICA{}", 'SMOOTHED')   
          
@@ -277,8 +279,6 @@ initUnmixDistFromTruth <- c()
 
 finalUnmixDistFromTruth <- c()
          
-
-
 
 for (snr in SNRs){    
     
@@ -373,13 +373,25 @@ for (snr in SNRs){
 
           scoreValuesAlternateICA <- tweedieAlternateICAInfo$tweedieEstimates
 
-            ourMethodResults <- tweedieCorrectionWithICAWarmStart(X, Sigma_gamma=Sigma_gamma,  ### Tweedie's formula with estimtated score function.
-                                             functionalBasis=modelingBasis,        ### Score function estimated with ICA approach
-                                             gridStep = .001, lambdaGrid=10^seq(-6, 3, 1),
-                                             numberOfFolds = 2, numberOfKnotsScoreFunction = 8,
-                                          algorithmSpecs=algorithmSpecs,
-                                          updateUSpecs=updateUSpecs,
-                                                                 learningRateU=.2)  
+           # ourMethodResults <- tweedieCorrectionWithICAWarmStart(X, Sigma_gamma=Sigma_gamma,  ### Tweedie's formula with estimtated score function.
+           #                                  functionalBasis=modelingBasis,        ### Score function estimated with ICA approach
+           #                                  gridStep = .001, lambdaGrid=10^seq(-6, 3, 1),
+           #                                  numberOfFolds = 2, numberOfKnotsScoreFunction = 8,
+           #                               algorithmSpecs=algorithmSpecs,
+           #                               updateUSpecs=updateUSpecs,
+           #                                                      learningRateU=.2)  
+            
+            
+          ourMethodResults <- tweedieCorrectionWithICARandomRestart(X, Sigma_gamma,  ### Tweedie's formula with estimtated score function.
+                                     functionalBasis=modelingBasis,        ### Score function estimated with ICA approach
+                                     gridStep = .001, 
+                                     lambdaGrid=10^seq(-6, 6, 1),
+                                     numberOfFolds = 5, 
+                                     numberOfKnotsScoreFunction = 8,
+                                     numRestarts=5,
+                                     numFoldsRestarts=5,
+                                  algorithmSpecs=algorithmSpecs,
+                                  updateUSpecs=updateUSpecs)
 
 
 
@@ -448,16 +460,19 @@ for (snr in SNRs){
 
           timeEnd <- Sys.time()
 
-          print(paste("Iteration", i))
+          outMessage <- paste("SNR: ", snr, '; Iteration: ', i, sep='')
+      
+          print(outMessage)
+            
           print(difftime(timeEnd, timeStart, units='mins'))
 
         }
-
-    print(paste("SNR:", snr))
                                         
 }
          
          
+
+algorithmSpecs
 
  ### Score func MSE against SNR        
 meltedPerformanceDataBySNRScoreFunction <- melt(performanceDataBySNRScoreFunction)
@@ -648,13 +663,13 @@ close(fileConn)
          
 ### Outputting curve estimation info       
          
-ggsave(plot=snrCurvePlotWithUncertainty, filename=paste(curveDirectory, 
+ggsave(plot=snrCurvePlot, filename=paste(curveDirectory, 
         "curve_estimation_against_snr.pdf", sep='/'), 
        units='in', width=8, height=8) 
          
          
          
-ggsave(plot=snrCurvePlot, filename=paste(curveDirectory, 
+ggsave(plot=snrCurvePlotWithUncertainty, filename=paste(curveDirectory, 
         "curve_estimation_against_snr_uncertainty.pdf", sep='/'), 
        units='in', width=8, height=8) 
 
@@ -690,37 +705,3 @@ close(fileConn)
 write.csv(sim_params, file=paste(outputDirectory, 'parameters.csv', sep='/'))
 
 stopCluster(cl)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
