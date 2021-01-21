@@ -31,26 +31,6 @@ tweedieCorrectionNonJointICA <- function(X, Sigma_gamma,  ### Tweedie without jo
                                      numberOfKnotsScoreFunction = 8){
     
     Sigma_gamma = .5*(Sigma_gamma+t(Sigma_gamma))
-    
-    scoreListToVector <- function(aScoreList){
-    
-    ### The output. Its arguments are a numberic vector, and an argument for desired order of derivative
-    scoreVector <- function(theta, derivativeOrder=0){
-      
-      if (!is.matrix(theta)){
-        
-        theta <- array(theta, dim=c(length(theta), 1))
-        
-      }
-      
-      t(sapply(1:dim(theta)[1], FUN=function(x) aScoreList[[x]](theta[x,], derivativeOrder=derivativeOrder)))
-      
-    }
-    
-    return(scoreVector)
-    
-    
-  }
   
   if (any(is.na(X))){
     
@@ -73,7 +53,7 @@ tweedieCorrectionNonJointICA <- function(X, Sigma_gamma,  ### Tweedie without jo
   
   sigmaTilde <- Sigma_gamma %*% basisCovarianceMatrix %*% Sigma_gamma
 
-  covThetaMinusHalf <- matrixToPower(cov(t(X)), -.5)
+  covThetaMinusHalf <- solve(sqrtm(cov(t(X))))
 
   if (transformation=="ica"){
       
@@ -171,34 +151,12 @@ tweediesFormulaOracle <- function(X, W, U, Sigma_gamma, functionalBasis, gridSte
                                                   numberOfKnotsScoreFunction = 8,
                                                   maxIterations=100){
   
-  scoreListToVector <- function(aScoreList){
-    
-    ### The output. Its arguments are a numberic vector, and an argument for desired order of derivative
-    scoreVector <- function(theta, derivativeOrder=0){
-      
-      if (!is.matrix(theta)){
-        
-        theta <- array(theta, dim=c(length(theta), 1))
-        
-      }
-      
-      t(sapply(1:dim(theta)[1], FUN=function(x) aScoreList[[x]](theta[x,], derivativeOrder=derivativeOrder)))
-      
-    }
-    
-    return(scoreVector)
-    
-    
-  }
-  
   basisCovarianceMatrix <- ((t(functionalBasis) %*% ### Term calculated from basis used to model curves
                                functionalBasis)/dim(functionalBasis)[1])
   
   sigmaTilde <- Sigma_gamma %*% basisCovarianceMatrix %*% Sigma_gamma
   
-  covThetaMinusHalf <- matrixToPower(cov(t(X)), -.5) 
-  
-  Wtheta <- U %*% covThetaMinusHalf
+  Wtheta <- W
   
   oneVec <- array(rep(1, dim(sigmaTilde)[1]), dim=c(dim(sigmaTilde)[1], 1))
   
@@ -206,12 +164,6 @@ tweediesFormulaOracle <- function(X, W, U, Sigma_gamma, functionalBasis, gridSte
   #             FUN = function(x) t(oneVec) %*% (sigmaTilde * (x %*% t(x))) %*% oneVec)
   
   XUnmixed <- Wtheta %*% X
-  
-  #trueScoreCoordinates <- sapply(seq(1, dim(XUnmixed)[1]), FUN=function(i) scoreFunctionUpdate(Z=XUnmixed[i,], 
-  #              cW=cWs[i], lambdaGrid=lambdaGrid, numKnots=numberOfKnotsScoreFunction, 
-  #              gridStep=gridStep, nFolds=numberOfFolds), simplify = F)
-  
-  #TrueUnmixedScoreVector <- scoreListToVector(aScoreList=trueScoreCoordinates)
                
   TrueUnmixedScoreVector <- scoreFunctionUpdate(Z=XUnmixed, W=Wtheta, SigmaTilde=sigmaTilde, lambdaGrid=lambdaGrid, numKnots=numberOfKnotsScoreFunction, gridStep=gridStep,
                                     nFolds=numberOfFolds)
@@ -231,25 +183,6 @@ tweediesFormulaOracle <- function(X, W, U, Sigma_gamma, functionalBasis, gridSte
 
 
 
-
-
-
-
-
-
-
-
-
-
-matrixToPower <- function(aMatrix, power){ ### Utility for calculating matrices to given powers
-                                           ### Assumes square, symmetric matrix
-  matrixEigenDecomp <- eigen(aMatrix)
-  
-  matrixPowered <- matrixEigenDecomp$vectors %*% diag(matrixEigenDecomp$values^power) %*% t(matrixEigenDecomp$vectors)
-  
-  return(matrixPowered)
-  
-}
 
 
 
@@ -307,14 +240,14 @@ tweedieCorrectionWithICARandomRestart <- function(X, Sigma_gamma,  ### Tweedie's
   covTheta <- cov(t(X)) ### Estimated covariance of data
   
   ### Covariance of data to the -1/2 power
-  covThetaMinusHalf <- matrixToPower(covTheta, -.5)                     
+  covThetaMinusHalf <- solve(sqrtm(covTheta))                     
   
   ### Initialization of U, where U is in so(p) 
                                
   UInits <- lapply(1:numRestarts, FUN=function(x) gramSchmidt(array(rnorm(dim(X)[1]^2), dim=rep(dim(X)[1], 2)))$Q)   
 
   risksRestarts <- foreach(UInit=UInits, .combine=c, .packages=c("doParallel", "foreach", "splines2", "caret", "lava"),
-                          .export=c("scoreFunctionWithICA", "matrixToPower", "scoreFunctionUpdate",
+                          .export=c("scoreFunctionWithICA", "scoreFunctionUpdate",
                                    "unmixingMatrixUpdate")) %dopar% {                             
       
       risksThisRestart <- rep(NA, length(restartValidationFolds)  )    
@@ -414,7 +347,7 @@ tweedieCorrectionWithICAWarmStart <- function(X, Sigma_gamma,  ### Tweedie's for
   covTheta <- cov(t(X)) ### Estimated covariance of data
   
   ### Covariance of data to the -1/2 power
-  covThetaMinusHalf <- matrixToPower(covTheta, -.5)
+  covThetaMinusHalf <- solve(sqrtm(covTheta))
 
    fastICAInfo <- fastICA(t(X), n.comp = dim(Sigma_gamma)[1])
     
@@ -537,34 +470,12 @@ scoreFunctionWithICA <- function(thetaMatrix, sigmaTilde, UInit, lambdaGrid=10^s
       return(riskValue)
       
   }
-   
-  ### Converts list of functions to a vector function.
-  scoreListToVector <- function(aScoreList){
-    
-    ### The output. Its arguments are a numberic vector, and an argument for desired order of derivative
-    scoreVector <- function(theta, derivativeOrder=0){
-      
-      if (!is.matrix(theta)){
-        
-        theta <- array(theta, dim=c(length(theta), 1))
-        
-      }
-      
-      t(sapply(1:dim(theta)[1], FUN=function(x) aScoreList[[x]](theta[x,],
-                                                                derivativeOrder=derivativeOrder)))
-      
-    }
-    
-    return(scoreVector)
-    
-    
-  }
   
   ### Covariance of Data
   covTheta <- cov(t(thetaMatrix))
   
   ### Covariance of Data to the -1/2 power
-  covThetaMinusHalf <- matrixToPower(covTheta, -.5)
+  covThetaMinusHalf <- solve(sqrtm(covTheta))
   
   oneVec <- matrix(1, nrow=dim(UInit)[2], ncol=1)
   
@@ -744,10 +655,12 @@ unmixingMatrixUpdate <- function(thetaStarMatrix, UInit, sigmaTilde,
     
   Gamma <- cov(t(thetaStarMatrix))
     
-  thetaTildeMatrix <- matrixToPower(Gamma, -.5) %*% thetaStarMatrix
+  GammaMinusHalf <- solve(sqrtm(Gamma))
+    
+  thetaTildeMatrix <- GammaMinusHalf %*% thetaStarMatrix
   
   ### Note that A is a symmetric matrix
-  A <- matrixToPower(Gamma, -.5) %*% sigmaTilde %*% matrixToPower(Gamma, -.5)
+  A <- GammaMinusHalf %*% sigmaTilde %*% GammaMinusHalf
     
   ### The value of the risk
   rHat <- function(uRisk, ourScoreVector, thetaTildeMatrix, A){ 
@@ -938,8 +851,7 @@ scoreFunctionUpdate <- function(Z, W, SigmaTilde, lambdaGrid=10^seq(-6, 6, 1),
                                     nFolds=5){
     
   options(warn=-1)
-    
-    
+
   basisEvalInLongVec <- function(basisList, zVec){
     
     

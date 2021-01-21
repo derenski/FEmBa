@@ -190,7 +190,7 @@ curve_generator <- function(n_obs, misspessMat, Sigma_mu, Sigma_gamma, SNR,
     ### Generate unmixed data with NORTA
     XUnmixed <- norta(n, corr_mat = misspessMat, distribution = quantile_func)
       
-    XUnmixed <- matrixToPower(cov(t(XUnmixed)), -.5) %*% XUnmixed
+    XUnmixed <- solve(sqrtm((cov(t(XUnmixed))))) %*% XUnmixed
     
     ### True U in so(p)
       ### Try generatingU from different distributions rexp(dim(XUnmixed )[1]^2, rate=10)
@@ -198,7 +198,7 @@ curve_generator <- function(n_obs, misspessMat, Sigma_mu, Sigma_gamma, SNR,
                                dim=rep(dim(XUnmixed )[1], 2)))$Q 
     
     ### Covariance matrix to the -1/2 power
-    covMatMinusHalf <- matrixToPower(covMat, -.5)
+    covMatMinusHalf <- solve(sqrtm((covMat)))
     
     ### True unmixing matrix
     trueW <- UTrue %*% covMatMinusHalf
@@ -253,7 +253,7 @@ curve_generator <- function(n_obs, misspessMat, Sigma_mu, Sigma_gamma, SNR,
   
   Wtheta <- muModelData$W
   
-  U <- muModelData$W %*% matrixToPower(Sigma_mu, .5)
+  U <- muModelData$W %*% sqrtm(Sigma_mu)
   
   gammas <- (raw_snr/SNR)*norta(n_obs=n_obs, corr_mat=Sigma_gamma, distribution=qnorm)
   
@@ -288,14 +288,14 @@ curve_generator_forceICA <- function(n_obs, Sigma_mu, SNR,
                             sigma_e, unmixedCoordinateDist,
                             times){
   
-  ICAmodelDataMaker <- function(n, p, quantile_func, covMat){
+  ICAmodelDataMaker <- function(n, p, quantile_func, corrMat, SNR){
     
     ### Generate unmixed data with NORTA
     XPure <-   norta(10000, corr_mat = diag(rep(1,p)), distribution = quantile_func)
     
     XUnmixed <- norta(n, corr_mat = diag(rep(1,p)), distribution = quantile_func)
       
-    XUnmixed <- matrixToPower(cov(t(XPure)), -.5) %*% XUnmixed
+    XUnmixed <- solve(sqrtm(cov(t(XPure)))) %*% XUnmixed
     
     ### True U in so(p)
       ### Try generatingU from different distributions rexp(dim(XUnmixed )[1]^2, rate=10)
@@ -303,10 +303,10 @@ curve_generator_forceICA <- function(n_obs, Sigma_mu, SNR,
                                dim=rep(dim(XUnmixed )[1], 2)))$Q 
     
     ### Covariance matrix to the -1/2 power
-    covMatMinusHalf <- matrixToPower(covMat, -.5)
+    corrMatMinusHalf <- solve(sqrtm(corrMat))
     
     ### True unmixing matrix
-    trueW <- UTrue %*% covMatMinusHalf
+    trueW <- UTrue %*% corrMatMinusHalf
       
     XUnmixed <- XUnmixed - t(sapply(rowMeans(XUnmixed), rep, each=dim(XUnmixed)[2]))
     
@@ -321,13 +321,13 @@ curve_generator_forceICA <- function(n_obs, Sigma_mu, SNR,
   S <- bSpline(times, degree = min(p,3), df = p, intercept = T)
   
   icaModelData <- ICAmodelDataMaker(n=n_obs, p=p, quantile_func=unmixedCoordinateDist,
-                                   covMat=Sigma_mu)
+                                   corrMat=Sigma_mu)
     
   Omegas <- icaModelData$Omega
   
   Wtheta <- icaModelData$W
   
-  U <- icaModelData$W %*% matrixToPower(Sigma_mu, .5)
+  U <- icaModelData$W %*% sqrtm(Sigma_mu)
     
   deltaCovTerm <- make_rho_mat(rho=.2, p=p)  
     
@@ -341,19 +341,23 @@ curve_generator_forceICA <- function(n_obs, Sigma_mu, SNR,
   #unmixedPriorPart <- sqrt(SNR)*Omegas+deltaMatrix
   #unmixedGaussianPart <- gammas-deltaMatrix
     
-  unmixedPriorPart <- sqrt(SNR)*Omegas
+  unmixedPriorPart <- sqrt(SNR)* Omegas
   unmixedGaussianPart <- gammas
                                 
   thetas <- Atheta %*% (unmixedPriorPart+unmixedGaussianPart)
+    
+  covTheta <- Atheta %*% (SNR*diag(rep(1, dim(U)[1])) +diag(rep(1, dim(U)[1])) ) %*% t(Atheta)
+    
+  Wtheta <- U %*% solve(sqrtm(covTheta))
   
   Xs <- t(S %*% thetas)
 
   e_noise <- mvtnorm::rmvnorm(n_obs, mean = rep(0,length(times)),
                      sigma  = sigma_e*diag(length(times)))  
   
-  final_output <- list(mu= sqrt(SNR)* (Atheta %*% unmixedPriorPart)    ,
-                       Wtheta=Wtheta, omega= Wtheta %*% thetas, 
-                       theta=thetas, U=U, S=S, Xs=Xs, Sigma_gamma=(Atheta %*% t(Atheta)), 
+  final_output <- list(mu= (Atheta %*% unmixedPriorPart),
+                       Wtheta=Wtheta, omega= Omegas, 
+                       theta=thetas, U=U, S=S, Xs=Xs, Sigma_gamma=(Atheta %*% t(Atheta))/SNR, 
                        white_noise=e_noise)
   
   return(final_output)

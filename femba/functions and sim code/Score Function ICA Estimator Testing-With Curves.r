@@ -48,6 +48,25 @@ tableFixer <- function(badLatex){ ### Fixes tables that have a bad latex represe
     return(fixed_table)
 }
 
+
+
+
+sciFormatter <- function(number, digits){ ### Formats numbers in scientific notation, when appropriate
+
+        
+    neededNumber <- formatC(number, format = "e", digits = digits)
+        
+ #   if (str_detect(neededNumber, pattern="e(\\+|-)00$")){
+            
+  #      neededNumber <- str_replace( neededNumber, pattern="e(\\+|-)00$", replace="")  
+            
+            
+  #  }
+        
+    return(neededNumber)
+        
+}
+
 averagedVectorl2Norm <- function(X,Y){ ### Calculates L2-norms between N by T matrices
                                        ### Used to calculate L2-Norms of Curves. 
 
@@ -196,8 +215,6 @@ updateUSpecs=c(min_iterations=as.numeric(sim_params["min_iterations_Uupdate", ])
                  max_iterations=as.numeric(sim_params["max_iterations_Uupdate", ]), 
                  min_change=as.numeric(sim_params["min_change_Uupdate", ]))   
 
-
-
 ### This is where you can experiment with different priors.
 ### I would suggest settng the variables "takeAbs" and "makeSymmetric"
 ### equal to FALSE when experimenting. 
@@ -233,13 +250,20 @@ if (takeAbs){
     
 }
 
-### Generates the quantile function from the sample
-theQuantileFunction <- qarb(bigSample) 
 
-truehist(bigSample)
+
+#clusterIndicator <- sample(c(0,1), size=100000, replace=T)
+
+#bigSample <- rgamma(100000, shape=1, scale=.5)*clusterIndicator +(rgamma(100000, shape=1, scale=8)+10)*(1-clusterIndicator)
+
+### Generates the quantile function from the sample
+#theQuantileFunction <- qarb(bigSample) 
+
+coordinatePic <- ggplot(NULL, aes(x=bigSample)) + geom_histogram(aes(y=..density..), bins=30, color='blue') + theme_bw(base_size=20) + 
+xlab('Omega') + ylab("Density") + ggtitle("Prior Unmixed Coordinate Example")
 
 # c(.1, .25, .5, 1, 4, 9, 16, 25, 36)  
-SNRs <- c(.25, .5, 1, 4)  ### Various SNR's for which to calculate risk, L2-norm, etc.
+SNRs <- seq(.5, 4, length.out=5) ### Various SNR's for which to calculate risk, L2-norm, etc.
 
 methodNames <- c("\\fembant{}", "\\fembat{}", "\\fembafastICA{}", "\\fembajointICA{}", 'SMOOTHED')   
          
@@ -328,9 +352,7 @@ for (snr in SNRs){
 
             ### If not using tweedie setting, set modelingBasis <- diag(rep(1, dim(Sigma_gamma)[1]))
 
-          covThetaMinusHalfEst <- matrixToPower(covThetaEst, -.5)
-
-          oracleTweedieInfo <- tweediesFormulaOracle(X=X, W=trueW, U=trueW %*% solve(covThetaMinusHalfEst), Sigma_gamma=Sigma_gamma, 
+          oracleTweedieInfo <- tweediesFormulaOracle(X=X, W=trueW, U=simulationData$U, Sigma_gamma=Sigma_gamma, 
                                                   functionalBasis=modelingBasis, 
                                              gridStep = .001, lambdaGrid=10^seq(-6, 3, 1), numberOfFolds = 2, 
                                                   numberOfKnotsScoreFunction = 8, maxIterations=100)
@@ -373,25 +395,25 @@ for (snr in SNRs){
 
           scoreValuesAlternateICA <- tweedieAlternateICAInfo$tweedieEstimates
 
-           # ourMethodResults <- tweedieCorrectionWithICAWarmStart(X, Sigma_gamma=Sigma_gamma,  ### Tweedie's formula with estimtated score function.
-           #                                  functionalBasis=modelingBasis,        ### Score function estimated with ICA approach
-           #                                  gridStep = .001, lambdaGrid=10^seq(-6, 3, 1),
-           #                                  numberOfFolds = 2, numberOfKnotsScoreFunction = 8,
-           #                               algorithmSpecs=algorithmSpecs,
-           #                               updateUSpecs=updateUSpecs,
-           #                                                      learningRateU=.2)  
+            ourMethodResults <- tweedieCorrectionWithICAWarmStart(X, Sigma_gamma=Sigma_gamma,  ### Tweedie's formula with estimtated score function.
+                                           functionalBasis=modelingBasis,        ### Score function estimated with ICA approach
+                                           gridStep = .001, lambdaGrid=10^seq(-6, 3, 1),
+                                           numberOfFolds = 2, numberOfKnotsScoreFunction = 8,
+                                        algorithmSpecs=algorithmSpecs,
+                                          updateUSpecs=updateUSpecs,
+                                                                 learningRateU=.2)  
             
             
-          ourMethodResults <- tweedieCorrectionWithICARandomRestart(X, Sigma_gamma,  ### Tweedie's formula with estimtated score function.
-                                     functionalBasis=modelingBasis,        ### Score function estimated with ICA approach
-                                     gridStep = .001, 
-                                     lambdaGrid=10^seq(-6, 6, 1),
-                                     numberOfFolds = 5, 
-                                     numberOfKnotsScoreFunction = 8,
-                                     numRestarts=5,
-                                     numFoldsRestarts=5,
-                                  algorithmSpecs=algorithmSpecs,
-                                  updateUSpecs=updateUSpecs)
+  #        ourMethodResults <- tweedieCorrectionWithICARandomRestart(X, Sigma_gamma,  ### Tweedie's formula with estimtated score function.
+  #                                   functionalBasis=modelingBasis,        ### Score function estimated with ICA approach
+  #                                   gridStep = .001, 
+  #                                   lambdaGrid=10^seq(-6, 6, 1),
+  #                                   numberOfFolds = 5, 
+  #                                   numberOfKnotsScoreFunction = 8,
+  #                                   numRestarts=5,
+  #                                   numFoldsRestarts=5,
+  #                                algorithmSpecs=algorithmSpecs,
+  #                                updateUSpecs=updateUSpecs)
 
 
 
@@ -403,7 +425,7 @@ for (snr in SNRs){
           
           integralMatrix <- (t(simulationData$S) %*% simulationData$S)/dim(simulationData$S)[1]
             
-          integralMatrixOneHalf <-  matrixToPower(integralMatrix, .5) ### Needed for calculating score function Risk
+          integralMatrixOneHalf <- sqrtm(integralMatrix) ### Needed for calculating score function Risk
             
           scoreValuesThisIteration <- abind(integralMatrixOneHalf %*% scoreValuesAssumedIndependent, 
                                                       integralMatrixOneHalf %*% scoreValuesUncorrAssumedIndependent, 
@@ -472,14 +494,14 @@ for (snr in SNRs){
          
          
 
-algorithmSpecs
-
  ### Score func MSE against SNR        
 meltedPerformanceDataBySNRScoreFunction <- melt(performanceDataBySNRScoreFunction)
 names(meltedPerformanceDataBySNRScoreFunction) <- c('Method', 'Iteration', 'SNR', 'Risk')
 
+meltedPerformanceDataBySNRScoreFunction <- meltedPerformanceDataBySNRScoreFunction %>% filter(!is.na(Risk))
+
 aggMeltedPerformanceDataBySNRScoreFunction <- meltedPerformanceDataBySNRScoreFunction %>% group_by(Method, SNR=round(SNR, 3)) %>% 
-summarize(SE=sprintf("%.3f", round(max(0, sd(Risk)/sqrt(n())), 3)), Risk=sprintf("%.3f", round(max(0, mean(Risk)), 3)),
+summarize(SE=sciFormatter(sd(Risk, na.rm=T)/sqrt(n()), 3)   , Risk=sciFormatter(max(0, mean(Risk, na.rm=T)), 3),
          `Risk (SE)` = paste(Risk, ' (', SE, ')', sep=''))
          
 meltedPerformanceDataBySNRScoreFunction$Method <-factor(
@@ -499,54 +521,19 @@ aggMeltedPerformanceDataBySNRScoreFunction <- reshape2::dcast(aggMeltedPerforman
 
 aggMeltedPerformanceDataBySNRScoreFunctionForLatex <- knitr::kable(aggMeltedPerformanceDataBySNRScoreFunction, 'latex')
 
-  ### Curve estimation MSE against SNR        
-meltedPerformanceDataBySNRCurves <- melt(performanceDataBySNRCurves)
-         
-names(meltedPerformanceDataBySNRCurves) <- c('Method', 'Iteration', 'SNR', 'l2-norm')
-         
-meltedPerformanceDataBySNRCurves$Method <-factor(
-    meltedPerformanceDataBySNRCurves$Method, levels=methodNames)
-
-aggMeltedPerformanceDataBySNRCurves <- meltedPerformanceDataBySNRCurves %>% group_by(Method, SNR=round(SNR, 3)) %>% 
-summarize(SE=sprintf("%.3f", round(max(0, sd(sqrt(`l2-norm`))/sqrt(n())), 3)), `l2-norm`=sprintf("%.3f", round(max(0, mean(sqrt(`l2-norm`))), 3)),
-         `l2-norm (SE)` = paste(`l2-norm`, ' (', SE, ')', sep=''))
-
-
-### Why MSE increases as a function of SNR
-### MSE between original and true data is a constant
-### theta+Sigma*nu-mu= (theta-mu)+Sigma*nu
-### When SNR is large, Sigma*mu is small 
-
-
-snrCurvePlot <- ggplot(aggMeltedPerformanceDataBySNRCurves, aes(x=as.numeric(SNR), y=as.numeric(`l2-norm`), color=Method)) + 
-         geom_line(lwd=1.5)  +
-         theme_bw(base_size=20) + ylab('L2-Norm') + ggtitle("L2-Norm for Curves Against SNR, by Method") 
-
-snrCurvePlotWithUncertainty <- ggplot(meltedPerformanceDataBySNRCurves, aes(x=SNR, y=sqrt(`l2-norm`), color=Method)) + 
-         geom_smooth(lwd=1.5)  +
-         theme_bw(base_size=20) + ylab('L2-Norm') + ggtitle("L2-Norm for Curves Against SNR, by Method") 
-
-
-
-                    
-
-#### Curve L2-norm data, for LATEX
-
-aggMeltedPerformanceDataBySNRCurves <- reshape2::dcast(aggMeltedPerformanceDataBySNRCurves, Method ~ SNR, value.var="l2-norm (SE)")
-
-aggMeltedPerformanceDataBySNRCurvesForLatex <- knitr::kable(aggMeltedPerformanceDataBySNRCurves, 'latex')
-
 ### Relative Risk against SNR        
 meltedPerformanceDataBySNRRelativeRisk<- melt(performanceDataBySNRRelativeRisk)
          
 names(meltedPerformanceDataBySNRRelativeRisk) <- c('Method', 'Iteration', 'SNR', 'Relative Risk')
+
+meltedPerformanceDataBySNRRelativeRisk <- meltedPerformanceDataBySNRRelativeRisk %>% filter(!is.na(`Relative Risk`))
          
 meltedPerformanceDataBySNRRelativeRisk$Method <-factor(
     meltedPerformanceDataBySNRRelativeRisk$Method, levels=methodNames)
 
 
 aggMeltedPerformanceDataBySNRRelativeRisk <- meltedPerformanceDataBySNRRelativeRisk%>% group_by(Method, SNR=round(SNR, 3)) %>% 
-summarize(SE=sprintf("%.3f", round(max(0, sd(`Relative Risk`)/sqrt(n())), 3)), `Relative Risk`=sprintf("%.3f", round(max(0, mean(`Relative Risk`)), 3)),
+summarize(SE=sciFormatter(sd(`Relative Risk`, na.rm=T)/sqrt(n()), 3), `Relative Risk`=sciFormatter( mean(`Relative Risk`, na.rm=T), 3),
          `Relative Risk (SE)` = paste(`Relative Risk`, ' (', SE, ')', sep=''))
 
 
@@ -555,7 +542,7 @@ snrRelativeRiskPlot <- ggplot(aggMeltedPerformanceDataBySNRRelativeRisk, aes(x=a
 geom_line(lwd=1.5)  +
          theme_bw(base_size=20) + ylab('MSE') + ggtitle("Relative Risk Against SNR, by Method")
 
-snrRelativeRiskPlotWithUncertainty <- ggplot(meltedPerformanceDataBySNRRelativeRisk, aes(x=SNR, y=(pmax(0, `Relative Risk`)), color=Method)) +
+snrRelativeRiskPlotWithUncertainty <- ggplot(meltedPerformanceDataBySNRRelativeRisk, aes(x=SNR, y=( `Relative Risk`), color=Method)) +
 geom_smooth(lwd=1.5)  +
          theme_bw(base_size=20) + ylab('MSE') + ggtitle("Relative Risk Against SNR, by Method")
          
@@ -605,8 +592,6 @@ dir.create(outputDirectory)
 
 ### Results from different analyses go to different directories. 
 scoreDirectory <- paste(outputDirectory, 'score_function_estimation_performance', sep='/')                                                                              
-                                                                              
-curveDirectory <- paste(outputDirectory, 'curve_estimation_performance', sep='/')  
 
 relativeRiskDirectory <- paste(outputDirectory, 'relative_risk_performance', sep='/')  
                                                                               
@@ -615,15 +600,7 @@ if(!dir.exists(scoreDirectory)){
   dir.create(scoreDirectory)
   
   
-}
-                                                                              
-                                                                              
-if(!dir.exists(curveDirectory )){
-  
-  dir.create(curveDirectory)
-  
-  
-}                           
+}                
         
 if(!dir.exists(relativeRiskDirectory )){
   
@@ -632,13 +609,6 @@ if(!dir.exists(relativeRiskDirectory )){
   
 }                           
   
-
-
-
-
-
-
-
 
 
 
@@ -657,46 +627,21 @@ fileConn<-file(paste(scoreDirectory,
         "score_against_snr_table.txt", sep='/'))
 writeLines(tableFixer(aggMeltedPerformanceDataBySNRScoreFunctionForLatex)  , fileConn)
 close(fileConn)       
-         
-         
-         
-         
-### Outputting curve estimation info       
-         
-ggsave(plot=snrCurvePlot, filename=paste(curveDirectory, 
-        "curve_estimation_against_snr.pdf", sep='/'), 
-       units='in', width=8, height=8) 
-         
-         
-         
-ggsave(plot=snrCurvePlotWithUncertainty, filename=paste(curveDirectory, 
-        "curve_estimation_against_snr_uncertainty.pdf", sep='/'), 
-       units='in', width=8, height=8) 
-
-
-
-
-fileConn<-file(paste(curveDirectory, 
-        "score_against_snr_table.txt", sep='/'))
-writeLines(tableFixer(aggMeltedPerformanceDataBySNRCurvesForLatex )  , fileConn)
-close(fileConn)     
-
-
 
 ### Outputting relative risk estimation info
 
 
 ggsave(plot=snrRelativeRiskPlot, filename=paste(relativeRiskDirectory, 
-        "curve_estimation_against_snr.pdf", sep='/'), 
+        "relative_risk_against_snr.pdf", sep='/'), 
        units='in', width=8, height=8) 
          
          
 ggsave(plot=snrRelativeRiskPlotWithUncertainty, filename=paste(relativeRiskDirectory, 
-        "curve_estimation_against_snr_uncertainty.pdf", sep='/'), 
+        "relative_risk_against_snr_uncertainty.pdf", sep='/'), 
        units='in', width=8, height=8)
 
 fileConn<-file(paste(relativeRiskDirectory, 
-        "score_against_snr_table.txt", sep='/'))
+        "relative_risk_against_snr_table.txt", sep='/'))
 writeLines(tableFixer(aggMeltedPerformanceDataBySNRRelativeRiskForLatex)  , fileConn)
 close(fileConn)     
 
@@ -704,4 +649,13 @@ close(fileConn)
 
 write.csv(sim_params, file=paste(outputDirectory, 'parameters.csv', sep='/'))
 
+
+
+### Example of unmized coordinate distribution, sans Gaussian noise
+ggsave(plot=coordinatePic, filename=paste(outputDirectory, 
+        "unmixed_coordinate_distribution.pdf", sep='/'), 
+       units='in', width=8, height=8)
+
 stopCluster(cl)
+
+
