@@ -74,6 +74,20 @@ averagedVectorl2Norm <- function(X,Y){ ### Calculates L2-norms between N by T ma
     
 }
 
+
+scoreFunctionLoss <- function(X, Y, sigmaTilde){
+    
+    differenceMatrix <- X-Y
+    
+    theNums <- apply(differenceMatrix, MARGIN=2, FUN=function(x) t(x) %*% sigmaTilde %*% x )
+                     
+    return(mean(theNums, na.rm=T))
+    
+}
+
+
+
+
 distWithPermutAndSgnChange <- function(X, Y){
   
   indexes <- seq(1, dim(X)[1], 1)
@@ -250,20 +264,22 @@ if (takeAbs){
     
 }
 
-
-
 #clusterIndicator <- sample(c(0,1), size=100000, replace=T)
 
-#bigSample <- rgamma(100000, shape=1, scale=.5)*clusterIndicator +(rgamma(100000, shape=1, scale=8)+10)*(1-clusterIndicator)
+#bigSample <- rgamma(100000, shape=1, scale=.5)*clusterIndicator +(rnorm(10000, mean=0, sd=3)+10)*(1-clusterIndicator)
+
 
 ### Generates the quantile function from the sample
-#theQuantileFunction <- qarb(bigSample) 
+theQuantileFunction <- qarb(bigSample) 
 
 coordinatePic <- ggplot(NULL, aes(x=bigSample)) + geom_histogram(aes(y=..density..), bins=30, color='blue') + theme_bw(base_size=20) + 
 xlab('Omega') + ylab("Density") + ggtitle("Prior Unmixed Coordinate Example")
 
 # c(.1, .25, .5, 1, 4, 9, 16, 25, 36)  
-SNRs <- seq(.5, 4, length.out=5) ### Various SNR's for which to calculate risk, L2-norm, etc.
+
+set.seed(4538729)
+
+SNRs <- seq(.75, 4, length.out=5) ### Various SNR's for which to calculate risk, L2-norm, etc.
 
 methodNames <- c("\\fembant{}", "\\fembat{}", "\\fembafastICA{}", "\\fembajointICA{}", 'SMOOTHED')   
          
@@ -427,10 +443,10 @@ for (snr in SNRs){
             
           integralMatrixOneHalf <- sqrtm(integralMatrix) ### Needed for calculating score function Risk
             
-          scoreValuesThisIteration <- abind(integralMatrixOneHalf %*% scoreValuesAssumedIndependent, 
-                                                      integralMatrixOneHalf %*% scoreValuesUncorrAssumedIndependent, 
-                                                      integralMatrixOneHalf %*% scoreValuesAlternateICA, 
-                                                      integralMatrixOneHalf %*%scoreValuesOurMethod, along=3)
+          scoreValuesThisIteration <- abind(scoreValuesAssumedIndependent, 
+                                                      scoreValuesUncorrAssumedIndependent, 
+                                                     scoreValuesAlternateICA, 
+                                                 scoreValuesOurMethod, along=3)
             
           curvesThisIteration <- abind(t(simulationData$S %*% scoreValuesAssumedIndependent), t(simulationData$S %*%
                                             scoreValuesUncorrAssumedIndependent), 
@@ -444,10 +460,8 @@ for (snr in SNRs){
             
             
           #### Score Function Risk
-          errorsThisIterationScoreFunction <- plyr::aaply(scoreValuesThisIteration, .margins=3, 
-                                          .fun= averagedVectorl2Norm, Y=integralMatrixOneHalf%*% oracleTweedieValues)
-            
-          aggErrorsThisIterationScoreFunction <- rowMeans(errorsThisIterationScoreFunction)  
+          aggErrorsThisIterationScoreFunction <- plyr::aaply(scoreValuesThisIteration, .margins=3, 
+                                          .fun= scoreFunctionLoss, Y=oracleTweedieValues, sigmaTilde=integralMatrix)
             
           ### Error, Tweedie estimators to truth
           errorsThisIterationCurves <- plyr::aaply(curvesThisIteration, .margins=3, 

@@ -3,9 +3,9 @@ For this scenario:
 
 clusterIndicator <- sample(c(0,1), size=100000, replace=T)
 
-bigSample <- rgamma(100000, shape=1, scale=.5)*clusterIndicator +(rnorm(mean=0, sd=3)+10)*(1-clusterIndicator)
+bigSample <- rgamma(100000, shape=1, scale=.5)*clusterIndicator +(rnorm(10000, mean=0, sd=3)+10)*(1-clusterIndicator)
 
-Asymmetric mixture of two gammas
+Asymmetric mixture of a gamma and a Gaussian
 
 
 
